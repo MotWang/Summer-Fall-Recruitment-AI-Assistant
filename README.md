@@ -2,6 +2,10 @@
 
 一款本地优先的求职助手：把每一条 JD、每一轮面试、每一份过往经历，都沉淀为可被 AI 反复检索与重写的资产。
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/MotWang/Summer-Fall-Recruitment-AI-Assistant?quickstart=1)
+
+**一键运行（推荐）**：点击上方徽章 → 等待 Codespace 创建完成 → 浏览器会自动打开 `http://localhost:3055`。无需本地安装 Node，AI 未配置时使用本地 Mock。
+
 ---
 
 ## 1. 功能一览
@@ -99,7 +103,18 @@ data/
 
 ## 4. 启动
 
-需要 Node.js ≥ 18.18。`better-sqlite3` 会在 `pnpm/npm install` 时编译原生模块；如失败，请确保本机有 Xcode CLI / build-essential。
+需要 Node.js ≥ 18.18。`better-sqlite3` 会在 `npm install` 时编译原生模块；如失败，请确保本机有 Xcode CLI / build-essential。
+
+### 在 GitHub 上直接运行（Codespaces）
+
+1. 点击 README 顶部的 **Open in GitHub Codespaces** 徽章
+2. 登录 GitHub 后创建 Codespace（首次约 2–3 分钟）
+3. 环境就绪后会自动执行 `npm install` 并启动 `npm run dev`
+4. 在 **Ports** 面板打开端口 **3055**，或等待浏览器自动弹出
+
+可选：在仓库 **Settings → Secrets and variables → Codespaces** 中配置 `ANTHROPIC_API_KEY`、`BEDROCK_*` 或 `OPENROUTER_API_KEY`，Codespace 重启后 AI 功能即生效。不配置也能完整使用（Mock 模式）。
+
+### 本地运行
 
 ```bash
 # 1. 安装依赖
@@ -108,22 +123,34 @@ npm install
 # 2. （可选）灌入示例数据
 npm run db:seed
 
-# 3. 启动开发服务器
-npm run dev
-# → http://localhost:3000
+# 3. 启动（生产模式，推荐）
+npm run serve
+# 或开发模式：npm run dev
+# → http://localhost:3055
 ```
+
+macOS 用户也可双击项目根目录的 `start.command`。
 
 ### 接入真实 AI
 
-复制 `.env.example` 为 `.env.local`，填入：
+复制 `.env.example` 为 `.env.local`（本地）或在 **Codespaces Secrets** 中配置环境变量：
 
 ```ini
+# Anthropic 官方
 ANTHROPIC_API_KEY=sk-ant-...
-ANTHROPIC_MODEL=claude-sonnet-4-5   # 可选，默认 sonnet-4-5
+ANTHROPIC_MODEL=claude-sonnet-4-5
+
+# 或兼容网关（Bedrock / MaaS）
+BEDROCK_BASE_URL=https://your-gateway.example.com/cowork/
+BEDROCK_API_KEY=...
+BEDROCK_MODEL=global.anthropic.claude-sonnet-4-6
+
+# 或 OpenRouter
+OPENROUTER_API_KEY=sk-or-...
+OPENROUTER_MODEL=anthropic/claude-sonnet-4
 ```
 
-重启 dev server。左下角导航处的 provider 指示灯会从灰色变橙色。
-不填 Key 时一切照常运行——只是解析精度会差一些（基于正则/词典启发式）。
+在应用 **设置** 页选择接入方式并保存。不填 Key 时一切照常运行（本地 Mock）。
 
 ### 数据导出 / 备份
 
