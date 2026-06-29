@@ -1,0 +1,18 @@
+node_modules/
+.next/
+out/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+tsconfig.tsbuildinfo
+
+# 本地数据库与用户数据（不上传）
+data/recruit.db
+data/recruit.db-*
+data/uploads/
+
+# 测试脚本可能含本地调试输出
+scripts/test-bedrock.mjs.log

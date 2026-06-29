@@ -1,0 +1,23 @@
+{
+  "name": "Recruit Copilot",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {}
+  },
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Next.js",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "npm install && npm run db:seed || true",
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    }
+  },
+  "remoteEnv": {
+    "RECRUIT_DB_PATH": "${containerWorkspaceFolder}/data/recruit.db"
+  }
+}

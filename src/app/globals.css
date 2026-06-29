@@ -1,0 +1,220 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* —— 主题：默认 light + clay。data-theme="dark" 反相，data-accent 切换强调色 —— */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #F5F4ED;
+  --bg-elev: #FBFAF5;
+  --bg-quiet: #EDEBE0;
+  --text: #1F1E1B;
+  --text-muted: #6A675F;
+  --text-faint: #9A968B;
+  --border: #E8E6DE;
+  --accent: #CC785C;
+  --accent-strong: #B5604A;
+  --accent-soft: #FBF1EC;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #131210;
+  --bg-elev: #1B1A17;
+  --bg-quiet: #232220;
+  --text: #ECEAE2;
+  --text-muted: #B8B5AB;
+  --text-faint: #797670;
+  --border: #2C2B27;
+  --accent: #DC9170;
+  --accent-strong: #E9B79E;
+  --accent-soft: #2A1E18;
+}
+
+:root[data-accent="sage"] {
+  --accent: #8AA17B;
+  --accent-strong: #6F8A60;
+  --accent-soft: #E8EFE3;
+}
+:root[data-theme="dark"][data-accent="sage"] {
+  --accent: #A8C396;
+  --accent-strong: #C0D8AF;
+  --accent-soft: #1B231A;
+}
+
+:root[data-accent="slate"] {
+  --accent: #6F7B8A;
+  --accent-strong: #56616E;
+  --accent-soft: #E2E6EB;
+}
+:root[data-theme="dark"][data-accent="slate"] {
+  --accent: #91A0B2;
+  --accent-strong: #B1BDCB;
+  --accent-soft: #1A1E24;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-feature-settings: "ss01", "cv11";
+}
+
+body {
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter",
+    "PingFang SC", "Hiragino Sans GB", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* —— 通用组件类 —— */
+@layer components {
+  .surface {
+    @apply bg-ivory-50 border border-ink-100 rounded-2xl;
+  }
+  .surface-quiet {
+    @apply bg-transparent border border-ink-100 rounded-2xl;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border;
+  }
+  .field-label {
+    @apply text-[11px] uppercase tracking-[0.14em] text-ink-300 font-medium;
+  }
+  .input {
+    @apply w-full bg-ivory-50 border border-ink-100 rounded-xl px-3.5 py-2.5 text-sm
+           text-ink-700 placeholder:text-ink-300
+           focus:outline-none focus:border-ink-300 focus:ring-2 focus:ring-ink-200/40
+           transition;
+  }
+  .textarea {
+    @apply input min-h-[120px] resize-y leading-relaxed;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium
+           border border-transparent transition select-none disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-ink-700 text-ivory-50 hover:bg-ink-800;
+  }
+  .btn-accent {
+    @apply btn bg-clay-400 text-ivory-50 hover:bg-clay-500;
+  }
+  .btn-ghost {
+    @apply btn border-ink-100 text-ink-500 hover:text-ink-700 hover:border-ink-200 hover:bg-ivory-50;
+  }
+  .btn-quiet {
+    @apply btn text-ink-400 hover:text-ink-700;
+  }
+  .link {
+    @apply text-ink-500 underline decoration-ink-200 underline-offset-2 hover:text-clay-500 hover:decoration-clay-300;
+  }
+  .display-1 {
+    @apply font-serif text-[42px] leading-[1.1] tracking-tightish text-ink-800;
+  }
+  .display-2 {
+    @apply font-serif text-[26px] leading-[1.15] tracking-tightish text-ink-800;
+  }
+  .label-eyebrow {
+    @apply text-[11px] uppercase tracking-[0.18em] text-ink-300 font-medium;
+  }
+}
+
+/* Markdown 渲染区域 */
+.prose-anthropic {
+  @apply text-ink-600 leading-relaxed;
+}
+.prose-anthropic h1 {
+  @apply font-serif text-2xl text-ink-800 mt-6 mb-3;
+}
+.prose-anthropic h2 {
+  @apply font-serif text-xl text-ink-800 mt-5 mb-2;
+}
+.prose-anthropic h3 {
+  @apply font-semibold text-ink-700 mt-4 mb-2;
+}
+.prose-anthropic p {
+  @apply my-2;
+}
+.prose-anthropic ul {
+  @apply list-disc pl-5 my-2;
+}
+.prose-anthropic ol {
+  @apply list-decimal pl-5 my-2;
+}
+.prose-anthropic code {
+  @apply bg-ivory-200 text-ink-700 px-1 py-0.5 rounded;
+}
+.prose-anthropic blockquote {
+  @apply border-l-2 border-clay-300 pl-3 text-ink-400 italic my-3;
+}
+
+/* 状态色板 — 统一在 clay 系内（不混入 emerald 等异色，保持克制） */
+.status-wishlist { @apply bg-ivory-200 text-ink-500 border-ink-100; }
+.status-applied { @apply bg-clay-50 text-clay-600 border-clay-100; }
+.status-om_assessment { @apply bg-clay-50 text-clay-600 border-clay-100; }
+.status-interviewing { @apply bg-clay-100 text-clay-700 border-clay-200; }
+.status-offer { @apply bg-clay-200 text-clay-700 border-clay-300; }
+.status-rejected { @apply bg-ink-50 text-ink-400 border-ink-100; }
+.status-withdrawn { @apply bg-ink-50 text-ink-400 border-ink-100; }
+
+/* —— 暗色模式覆盖：保留同样的语义，反相亮度 —— */
+:root[data-theme="dark"] {
+  /* ivory 系（背景/低对比） */
+  --tw-color-ivory-50: #1B1A17;
+  --tw-color-ivory-100: #131210;
+  --tw-color-ivory-200: #232220;
+  --tw-color-ivory-300: #2D2C29;
+  /* ink 系（文字/边框） */
+  --tw-color-ink-50: #1F1E1B;
+  --tw-color-ink-100: #2C2B27;
+  --tw-color-ink-200: #3D3B36;
+  --tw-color-ink-300: #797670;
+  --tw-color-ink-400: #9A968B;
+  --tw-color-ink-500: #B8B5AB;
+  --tw-color-ink-600: #D6D2C8;
+  --tw-color-ink-700: #ECEAE2;
+  --tw-color-ink-800: #F5F4ED;
+}
+
+:root[data-theme="dark"] body { background: var(--bg); color: var(--text); }
+
+:root[data-theme="dark"] .bg-ivory-50 { background-color: var(--tw-color-ivory-50); }
+:root[data-theme="dark"] .bg-ivory-100,
+:root[data-theme="dark"] .bg-ivory-100\/40,
+:root[data-theme="dark"] .bg-ivory-100\/60 { background-color: var(--tw-color-ivory-100); }
+:root[data-theme="dark"] .bg-ivory-200,
+:root[data-theme="dark"] .bg-ivory-200\/40 { background-color: var(--tw-color-ivory-200); }
+
+:root[data-theme="dark"] .text-ink-300 { color: var(--tw-color-ink-300); }
+:root[data-theme="dark"] .text-ink-400 { color: var(--tw-color-ink-400); }
+:root[data-theme="dark"] .text-ink-500 { color: var(--tw-color-ink-500); }
+:root[data-theme="dark"] .text-ink-600 { color: var(--tw-color-ink-600); }
+:root[data-theme="dark"] .text-ink-700 { color: var(--tw-color-ink-700); }
+:root[data-theme="dark"] .text-ink-800 { color: var(--tw-color-ink-800); }
+
+:root[data-theme="dark"] .border-ink-100 { border-color: var(--tw-color-ink-100); }
+:root[data-theme="dark"] .border-ink-200 { border-color: var(--tw-color-ink-200); }
+:root[data-theme="dark"] .divide-ink-100 > * + * { border-color: var(--tw-color-ink-100); }
+
+:root[data-theme="dark"] .bg-ink-700 { background-color: var(--tw-color-ink-700); color: var(--tw-color-ivory-50); }
+:root[data-theme="dark"] .bg-ink-700:hover,
+:root[data-theme="dark"] .hover\:bg-ink-800:hover { background-color: var(--tw-color-ink-800); }
+
+/* —— 强调色：用 CSS var 重新染色 clay tailwind utility —— */
+.bg-clay-400,
+.hover\:bg-clay-500:hover { background-color: var(--accent); }
+.bg-clay-500 { background-color: var(--accent-strong); }
+.bg-clay-50 { background-color: var(--accent-soft); }
+.text-clay-500,
+.hover\:text-clay-500:hover { color: var(--accent); }
+.text-clay-600 { color: var(--accent-strong); }
+.text-clay-700 { color: var(--accent-strong); }
+.border-clay-200,
+.border-clay-300 { border-color: var(--accent); }
+.decoration-clay-400 { text-decoration-color: var(--accent); }

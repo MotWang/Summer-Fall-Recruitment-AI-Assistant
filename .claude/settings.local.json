@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PORT=3055 npm run dev)",
+      "Bash(echo \"Started with PID: $!\")",
+      "Read(//tmp/claude/**)",
+      "Bash(lsof -iTCP:3055 -sTCP:LISTEN -n -P)",
+      "Bash(rm -f src/app/ingest/page.tsx src/app/ingest/form.tsx)",
+      "Bash(rmdir src/app/ingest)",
+      "Bash(rm -f src/app/studio/page.tsx)",
+      "Bash(rmdir src/app/studio)",
+      "Bash(rm -rf .next)",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)"
+    ]
+  }
+}
