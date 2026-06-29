@@ -4,6 +4,8 @@ import { NextRequest } from "next/server";
 import { getProvider } from "@/lib/ai";
 import { ok, err } from "@/lib/http";
 import { extractPdf, extractDocx, fetchUrlText } from "@/lib/extract";
+import { inferIndustryFromText, normalizeIndustry } from "@/lib/industries";
+import { inferSeason } from "@/lib/seasons";
 import type { Application } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -48,7 +50,11 @@ export async function POST(req: NextRequest) {
     const draft: Partial<Application> = {
       company: parsed.company,
       role: parsed.role,
-      industry: parsed.industry ?? null,
+      industry:
+        normalizeIndustry(parsed.industry) ??
+        inferIndustryFromText(text) ??
+        parsed.industry ??
+        null,
       location: parsed.location ?? null,
       postedAt: parsed.postedAt ?? null,
       deadline: parsed.deadline ?? null,
@@ -56,8 +62,15 @@ export async function POST(req: NextRequest) {
       jdSummary: parsed.jdSummary ?? null,
       keywords: parsed.keywords ?? [],
       sourceUrl: body.url ?? null,
-      sourceType: body.url ? "url" : body.pdfBase64 ? "pdf" : body.docxBase64 ? "pdf" : "text",
+      sourceType: body.url
+        ? "url"
+        : body.pdfBase64
+        ? "pdf"
+        : body.docxBase64
+        ? "docx"
+        : "text",
       jdRaw: text.slice(0, 24000),
+      season: inferSeason(text),
       status: "wishlist",
     };
 

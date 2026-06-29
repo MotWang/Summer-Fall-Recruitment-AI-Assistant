@@ -44,24 +44,107 @@ export interface ResumeStructured {
 
 export interface InterviewPrepInput {
   application: Application;
-  profileDocs: ProfileDoc[];
+  /** @deprecated 仅为向后兼容保留；当前实现读 profileEntries */
+  profileDocs?: ProfileDoc[];
   profileEntries?: ProfileEntry[];
   sharedExperiences: SharedExperience[];
 }
 
+export type MockInterviewCategory =
+  | "opening"
+  | "behavioral"
+  | "technical"
+  | "case"
+  | "culture"
+  | "closing";
+
+export interface MockInterviewQuestion {
+  id: string;
+  order: number;
+  category: MockInterviewCategory;
+  /** 面试官在视频里说的话 */
+  prompt: string;
+  /** 回答时间建议（秒） */
+  timeLimitSec: number;
+  /** 评估时关注的要点 */
+  evaluationRubric: string;
+  probeHints?: string[];
+}
+
+export interface MockVideoInterviewSession {
+  sessionId: string;
+  company: string;
+  role: string;
+  interviewKind: string;
+  round: number;
+  interviewerPersona: string;
+  openingScript: string;
+  questions: MockInterviewQuestion[];
+  closingScript: string;
+  /** 生成时使用的解析上下文摘要 */
+  contextSummary: string;
+}
+
+export interface MockVideoInterviewAnswer {
+  questionId: string;
+  transcript: string;
+  durationSec?: number;
+}
+
+export interface MockQuestionEvaluation {
+  questionId: string;
+  score: number;
+  strengths: string[];
+  improvements: string[];
+  sampleAnswerOutline?: string;
+}
+
+export interface MockVideoInterviewEvaluation {
+  sessionId: string;
+  overallScore: number;
+  dimensions: {
+    relevance: number;
+    structure: number;
+    depth: number;
+    communication: number;
+    roleFit: number;
+  };
+  questionEvaluations: MockQuestionEvaluation[];
+  summary: string;
+  topImprovements: string[];
+  passLikelihood: "low" | "medium" | "high";
+}
+
+export interface MockVideoInterviewStartInput extends InterviewPrepInput {
+  round?: number;
+  interviewKind?: string;
+}
+
+export interface MockVideoInterviewEvaluateInput {
+  application: Application;
+  session: MockVideoInterviewSession;
+  answers: MockVideoInterviewAnswer[];
+  profileDocs?: ProfileDoc[];
+  profileEntries?: ProfileEntry[];
+}
+
 export type ParsedEntry = Omit<ProfileEntry, "id" | "createdAt" | "updatedAt" | "status" | "source" | "sourceDocId">;
 
+export type { AiProviderId } from "../types";
+
 export interface AiProvider {
-  readonly name: "anthropic" | "bedrock" | "mock";
+  readonly name: import("../types").AiProviderId;
   parseJobPosting(raw: { url?: string; text?: string }): Promise<ParsedJob>;
   parseResume(text: string): Promise<ResumeStructured>;
-  /** 把简历 / CV 全文解析为模块化的条目列表 */
   parseResumeIntoEntries(text: string): Promise<ParsedEntry[]>;
   parseSharedExperience(raw: string, hint?: { company?: string }): Promise<ParsedExperience>;
   optimizeResume(input: {
     application: Application;
-    profileDocs: ProfileDoc[];
+    /** @deprecated 仅为向后兼容保留；当前实现读 profileEntries */
+    profileDocs?: ProfileDoc[];
     profileEntries?: ProfileEntry[];
   }): Promise<string>;
   prepareInterview(input: InterviewPrepInput): Promise<string>;
+  startMockVideoInterview(input: MockVideoInterviewStartInput): Promise<MockVideoInterviewSession>;
+  evaluateMockVideoInterview(input: MockVideoInterviewEvaluateInput): Promise<MockVideoInterviewEvaluation>;
 }

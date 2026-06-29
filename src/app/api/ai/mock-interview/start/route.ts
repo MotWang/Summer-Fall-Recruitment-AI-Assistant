@@ -7,11 +7,14 @@ import {
 } from "@/lib/repo";
 import { getProvider } from "@/lib/ai";
 import { ok, err, readJson } from "@/lib/http";
+import type { InterviewKind } from "@/lib/types";
 
 export const runtime = "nodejs";
 
 interface Body {
   applicationId: string;
+  round?: number;
+  kind?: InterviewKind;
 }
 
 export async function POST(req: NextRequest) {
@@ -19,21 +22,25 @@ export async function POST(req: NextRequest) {
     const body = await readJson<Body>(req);
     const app = getApplication(body.applicationId);
     if (!app) return err("application not found", 404);
-    const entries = listProfileEntries({ status: "active" });
-    const exps = listSharedExperiences({ company: app.company });
-    const md = await getProvider().prepareInterview({
+
+    const session = await getProvider().startMockVideoInterview({
       application: app,
       profileDocs: [],
-      profileEntries: entries,
-      sharedExperiences: exps,
+      profileEntries: listProfileEntries({ status: "active" }),
+      sharedExperiences: listSharedExperiences({ company: app.company }),
+      round: body.round ?? 1,
+      interviewKind: body.kind ?? "technical",
     });
+
     const artifact = createAiArtifact({
       applicationId: app.id,
-      kind: "interview_prep",
-      title: `面试准备 · ${app.company} · ${app.role}`,
-      content: md,
+      kind: "mock_interview_session",
+      title: `Mock 视频面试 · ${app.company} · 第 ${session.round} 轮`,
+      inputRef: session.sessionId,
+      content: JSON.stringify(session, null, 2),
     });
-    return ok(artifact);
+
+    return ok({ session, artifact });
   } catch (e: unknown) {
     return err((e as Error).message);
   }

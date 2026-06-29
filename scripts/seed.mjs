@@ -20,7 +20,7 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'wishlist',
     posted_at TEXT, deadline TEXT, applied_at TEXT,
     source_url TEXT, source_type TEXT, jd_raw TEXT, jd_summary TEXT,
-    keywords TEXT, salary TEXT, notes TEXT,
+    keywords TEXT, salary TEXT, notes TEXT, resume_variant TEXT,
     created_at TEXT NOT NULL, updated_at TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS interviews (
@@ -64,6 +64,10 @@ const cols = db.prepare(`PRAGMA table_info(shared_experiences)`).all();
 if (!cols.some((c) => c.name === "application_id")) {
   db.exec(`ALTER TABLE shared_experiences ADD COLUMN application_id TEXT REFERENCES applications(id) ON DELETE SET NULL`);
 }
+const appCols = db.prepare(`PRAGMA table_info(applications)`).all();
+if (!appCols.some((c) => c.name === "resume_variant")) {
+  db.exec(`ALTER TABLE applications ADD COLUMN resume_variant TEXT`);
+}
 
 const now = new Date().toISOString();
 const id = (p) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -106,6 +110,18 @@ const samples = [
     applied_at: "2026-06-05",
     jd_summary: "Coverage TMT, supporting M&A and ECM execution.",
     keywords: ["DCF", "Excel", "VBA"],
+  },
+  {
+    company: "招商局集团",
+    role: "投资分析春招",
+    industry: "金融 / 投资",
+    location: "深圳",
+    season: "spring-2027",
+    status: "wishlist",
+    posted_at: "2027-02-15",
+    deadline: "2027-03-30",
+    jd_summary: "2027 春招补录，覆盖一级股权投资执行。",
+    keywords: ["行业研究", "Pitch Deck"],
   },
 ];
 
@@ -151,9 +167,27 @@ const insEnt = db.prepare(`INSERT INTO profile_entries
 
 const entries = [
   {
-    m: "basic", t: "联系方式 & 教育背景", o: "清华大学", r: null,
+    m: "basic", t: "张三", o: "清华大学 · 经管学院", r: "工商管理 · 本科四年级",
     s: null, e: null, l: "北京",
-    sm: "工商管理本科 · GPA 3.8 / 4.0", b: ["邮箱：student@example.com", "学校：清华大学经管学院"], tg: ["GPA 3.8"],
+    sm: "对 AI 与金融的交叉机会感兴趣，正在寻找 2027 年暑期实习。",
+    b: ["邮箱：student@example.com", "电话：+86 138 0000 0000"],
+    tg: [],
+  },
+  {
+    m: "skill", t: "核心技能",
+    o: null, r: null, s: null, e: null, l: null,
+    sm: null, b: [],
+    tg: ["Python", "SQL", "DCF", "Figma", "用户研究", "Notion", "英语 / 普通话"],
+  },
+  {
+    m: "education", t: "清华大学", o: "清华大学经济管理学院", r: "工商管理学士",
+    s: "2023-09", e: "2027-06", l: "北京",
+    sm: "GPA 3.8 / 4.0 · 主修方向：战略与创新",
+    b: [
+      "核心课程：金融学、统计学、博弈论、产品设计",
+      "曾获国家奖学金（2024）",
+    ],
+    tg: ["GPA 3.8"],
   },
   {
     m: "internship", t: "腾讯 · 战略投资部", o: "腾讯", r: "战略投资实习生",
@@ -201,5 +235,5 @@ for (const ent of entries) {
   });
 }
 
-console.log(`seeded ${appIds.length} applications, ${entries.length} profile entries, 1 experience`);
+console.log(`seeded ${appIds.length} applications, ${entries.length} profile entries, 1 shared experience`);
 db.close();

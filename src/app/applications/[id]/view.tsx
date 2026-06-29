@@ -9,10 +9,13 @@ import {
   type AiArtifact,
   type Application,
   type Interview,
+  type ResumeVariant,
   type SharedExperience,
 } from "@/lib/types";
 import { SectionTitle, STATUS_LABEL, StatusPill } from "@/components/ui";
+import { IndustrySelect } from "@/components/industry-select";
 import { Markdown } from "@/components/markdown";
+import { MockVideoInterviewPanel } from "./mock-video-interview";
 
 const INTERVIEW_KINDS: { value: Interview["kind"]; label: string }[] = [
   { value: "online_assessment", label: "OA 笔试" },
@@ -34,6 +37,13 @@ const OUTCOMES: { value: Interview["outcome"]; label: string }[] = [
 ];
 
 type Tab = "info" | "interviews" | "experiences" | "studio";
+
+function resumeVariantOf(a: AiArtifact): ResumeVariant | null {
+  if (a.kind !== "resume_tailor") return null;
+  if (a.inputRef === "resume:cn" || /中文/.test(a.title)) return "cn";
+  if (a.inputRef === "resume:en" || /\(EN\)|English|Resume Tailor/i.test(a.title)) return "en";
+  return null;
+}
 
 export function ApplicationDetail({
   app,
@@ -82,18 +92,25 @@ export function ApplicationDetail({
     });
   }
 
-  async function runAi(kind: "resume_tailor" | "interview_prep") {
+  async function runAi(kind: "resume_tailor" | "interview_prep", variant?: "cn" | "en" | "both") {
     setAiLog("生成中…");
     const r = await fetch(
       kind === "resume_tailor" ? "/api/ai/optimize-resume" : "/api/ai/prepare-interview",
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ applicationId: app.id }),
+        body: JSON.stringify({ applicationId: app.id, variant }),
       },
     );
     const j = await r.json();
-    setAiLog(j.ok ? "已生成 ✓" : `失败：${j.error}`);
+    if (!j.ok) {
+      setAiLog(`失败：${j.error}`);
+    } else if (kind === "resume_tailor") {
+      const n = Array.isArray(j.data?.artifacts) ? j.data.artifacts.length : 1;
+      setAiLog(`已生成 ${n} 份简历优化 ✓`);
+    } else {
+      setAiLog("已生成 ✓");
+    }
     router.refresh();
   }
 
@@ -147,8 +164,11 @@ export function ApplicationDetail({
                     onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value }))} />
                 </Field>
                 <Field label="行业">
-                  <input className="input" defaultValue={app.industry ?? ""}
-                    onChange={(e) => setDraft((d) => ({ ...d, industry: e.target.value }))} />
+                  <IndustrySelect
+                    value={draft.industry ?? app.industry ?? ""}
+                    onChange={(v) => setDraft((d) => ({ ...d, industry: v || null }))}
+                    allowEmpty
+                  />
                 </Field>
                 <Field label="地点">
                   <input className="input" defaultValue={app.location ?? ""}
@@ -192,6 +212,10 @@ export function ApplicationDetail({
                 <Row k="薪资" v={app.salary} />
                 <Row k="季节" v={app.season} />
                 <Row k="来源" v={app.sourceType ?? "manual"} />
+                <Row
+                  k="简历默认版本"
+                  v={app.resumeVariant === "en" ? "English Version" : app.resumeVariant === "cn" ? "中文版" : "未设置"}
+                />
                 {app.notes && (
                   <div className="sm:col-span-2 pt-2 border-t border-ink-100">
                     <div className="field-label mb-1">备注</div>
@@ -228,17 +252,37 @@ export function ApplicationDetail({
           )}
 
           {tab === "studio" && (
+            <div className="space-y-6">
+              <MockVideoInterviewPanel app={app} />
             <section className="surface p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="display-2">AI 工作台</h2>
-                <div className="flex gap-2">
-                  <button className="btn-ghost" onClick={() => runAi("resume_tailor")} disabled={busy}>
-                    生成简历优化
+                <div className="flex gap-2 flex-wrap justify-end">
+                  <button className="btn-ghost" onClick={() => runAi("resume_tailor", "cn")} disabled={busy}>
+                    生成中文简历优化
+                  </button>
+                  <button className="btn-ghost" onClick={() => runAi("resume_tailor", "en")} disabled={busy}>
+                    生成英文简历优化
+                  </button>
+                  <button className="btn-ghost" onClick={() => runAi("resume_tailor", "both")} disabled={busy}>
+                    生成双版本
                   </button>
                   <button className="btn-accent" onClick={() => runAi("interview_prep")} disabled={busy}>
                     生成面试准备
                   </button>
                 </div>
+              </div>
+              <div className="mb-4 flex items-center gap-2">
+                <span className="text-xs text-ink-400">当前岗位默认投递版本</span>
+                <select
+                  className="input max-w-[220px]"
+                  value={app.resumeVariant ?? ""}
+                  onChange={(e) => patch({ resumeVariant: (e.target.value || null) as ResumeVariant | null })}
+                >
+                  <option value="">未设置（按岗位手动选）</option>
+                  <option value="cn">中文版（国内公司）</option>
+                  <option value="en">English Version（海外公司）</option>
+                </select>
               </div>
               {aiLog && <p className="text-xs text-ink-400 mb-3">{aiLog}</p>}
               {artifacts.length === 0 ? (
@@ -252,9 +296,30 @@ export function ApplicationDetail({
                       <div className="flex items-center justify-between mb-2">
                         <div>
                           <div className="label-eyebrow">
-                            {a.kind === "resume_tailor" ? "RESUME TAILOR" : "INTERVIEW PREP"}
+                            {a.kind === "resume_tailor"
+                              ? "RESUME TAILOR"
+                              : a.kind === "interview_prep"
+                                ? "INTERVIEW PREP"
+                                : a.kind === "mock_interview_session"
+                                  ? "MOCK INTERVIEW"
+                                  : a.kind === "mock_interview_evaluation"
+                                    ? "MOCK EVAL"
+                                    : a.kind.toUpperCase()}
                           </div>
                           <div className="text-ink-700 font-medium">{a.title}</div>
+                          {resumeVariantOf(a) && (
+                            <div className="mt-1 flex items-center gap-2">
+                              <span className="pill text-[10px] border-ink-100 text-ink-500">
+                                {resumeVariantOf(a) === "cn" ? "中文版" : "English"}
+                              </span>
+                              <button
+                                className="text-xs link"
+                                onClick={() => patch({ resumeVariant: resumeVariantOf(a) })}
+                              >
+                                设为当前岗位默认投递版本
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <span className="text-xs text-ink-300">
                           {new Date(a.createdAt).toLocaleString()}
@@ -266,6 +331,7 @@ export function ApplicationDetail({
                 </ul>
               )}
             </section>
+            </div>
           )}
         </div>
 

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { listApplications, getStats } from "@/lib/repo";
 import { SectionTitle, StatusPill, STATUS_LABEL } from "@/components/ui";
-import { providerName } from "@/lib/ai";
 import { APPLICATION_STATUSES, type ApplicationStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,12 +19,11 @@ export default function HomePage() {
     scheduled_at: string;
   }[];
   const counts = Object.fromEntries(stats.counts.map((c) => [c.status, c.n])) as Record<string, number>;
-  const provider = providerName();
 
   return (
     <div>
       <SectionTitle
-        eyebrow="概览 · OVERVIEW"
+        eyebrow="概览"
         title="把每一份投递，沉淀成可复用的资产。"
         subtitle="解析 JD、记录每一轮面试、围绕你的经历做检索与重写 — 用最少的字段，承载最大的信息密度。"
         right={
@@ -116,13 +114,9 @@ export default function HomePage() {
 
       <section className="mt-10 surface-quiet p-6 flex flex-wrap gap-6 items-center justify-between">
         <div>
-          <div className="label-eyebrow">AI Provider</div>
+          <div className="label-eyebrow">AI 功能</div>
           <p className="mt-2 text-ink-500">
-            {provider === "bedrock"
-              ? "小红书 MaaS Bedrock 已接入（Claude Opus 4.7）：解析、简历优化、面试准备均由模型生成。"
-              : provider === "anthropic"
-                ? "Anthropic Claude 已接入：解析、简历优化、面试准备均由模型生成。"
-                : "当前使用本地启发式 mock：完整可用，但精度有限。在 设置页 填入 API Key 即可切换。"}
+            可在设置页管理 AI 接入。JD 解析、简历优化、面试准备都会自动使用你当前配置的模型。
           </p>
         </div>
         <Link href="/settings" className="btn-accent">

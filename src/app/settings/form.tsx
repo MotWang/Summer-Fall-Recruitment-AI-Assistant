@@ -3,64 +3,67 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import type { AppSettings } from "@/lib/types";
+import type { AppSettings, AiProviderId } from "@/lib/types";
+import {
+  AI_PROVIDER_OPTIONS,
+  ANTHROPIC_MODELS,
+  GATEWAY_MODELS,
+  GATEWAY_PRESETS,
+  OPENROUTER_MODELS,
+  type GatewayPresetId,
+} from "@/lib/ai/provider-meta";
 
 interface Init {
+  aiProvider: AiProviderId;
   anthropicApiKeyMasked: string | null;
   anthropicModel: string;
   bedrockApiKeyMasked: string | null;
   bedrockBaseUrl: string;
   bedrockModel: string;
   bedrockRegion: string;
+  openrouterApiKeyMasked: string | null;
+  openrouterModel: string;
+  openrouterBaseUrl: string;
   theme: NonNullable<AppSettings["theme"]>;
   accent: NonNullable<AppSettings["accent"]>;
 }
 
-const ANTHROPIC_MODELS = [
-  { id: "claude-opus-4-8", label: "Opus 4.8 — 最强（贵）" },
-  { id: "claude-sonnet-4-6", label: "Sonnet 4.6 — 推荐（默认）" },
-  { id: "claude-sonnet-4-5", label: "Sonnet 4.5" },
-  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5 — 最便宜" },
-];
-
-const BEDROCK_MODELS = [
-  { id: "global.anthropic.claude-opus-4-7", label: "Claude Opus 4.7（小红书 MaaS）" },
-  { id: "global.anthropic.claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
-];
-
 export function SettingsForm({
   initialSettings,
-  provider,
+  activeProvider,
+  activeProviderLabel,
   dbPath,
 }: {
   initialSettings: Init;
-  provider: "anthropic" | "bedrock" | "mock";
+  activeProvider: AiProviderId;
+  activeProviderLabel: string;
   dbPath: string;
 }) {
   const router = useRouter();
 
-  const [aiMode, setAiMode] = useState<"bedrock" | "anthropic">(
-    provider === "anthropic" ? "anthropic" : "bedrock",
-  );
+  const [aiMode, setAiMode] = useState<AiProviderId>(initialSettings.aiProvider);
 
-  // —— Bedrock ——
   const [bedrockBaseUrl, setBedrockBaseUrl] = useState(initialSettings.bedrockBaseUrl);
   const [bedrockKeyInput, setBedrockKeyInput] = useState("");
   const [showBedrockKey, setShowBedrockKey] = useState(false);
   const [bedrockModel, setBedrockModel] = useState(initialSettings.bedrockModel);
   const [bedrockRegion, setBedrockRegion] = useState(initialSettings.bedrockRegion);
+  const [gatewayPreset, setGatewayPreset] = useState<GatewayPresetId>("custom");
 
-  // —— Anthropic ——
   const [keyInput, setKeyInput] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [model, setModel] = useState(initialSettings.anthropicModel);
+
+  const [openrouterKeyInput, setOpenrouterKeyInput] = useState("");
+  const [showOpenrouterKey, setShowOpenrouterKey] = useState(false);
+  const [openrouterModel, setOpenrouterModel] = useState(initialSettings.openrouterModel);
+  const [openrouterBaseUrl, setOpenrouterBaseUrl] = useState(initialSettings.openrouterBaseUrl);
 
   const [savingKey, setSavingKey] = useState(false);
   const [keyMsg, setKeyMsg] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState<string | null>(null);
 
-  // —— 外观 ——
   const [theme, setTheme] = useState(initialSettings.theme);
   const [accent, setAccent] = useState(initialSettings.accent);
 
@@ -68,32 +71,87 @@ export function SettingsForm({
     applyTheme(theme, accent);
   }, [theme, accent]);
 
+  function applyGatewayPreset(id: GatewayPresetId) {
+    setGatewayPreset(id);
+    const preset = GATEWAY_PRESETS.find((p) => p.id === id);
+    if (!preset || id === "custom") return;
+    if (preset.baseUrl) setBedrockBaseUrl(preset.baseUrl);
+    setBedrockRegion(preset.region);
+    setBedrockModel(preset.model);
+  }
+
+  function buildProviderPayload(): Partial<AppSettings> {
+    const base = { aiProvider: aiMode };
+    switch (aiMode) {
+      case "anthropic":
+        return {
+          ...base,
+          anthropicApiKey: keyInput || undefined,
+          anthropicModel: model,
+        };
+      case "gateway":
+        return {
+          ...base,
+          bedrockBaseUrl: bedrockBaseUrl.trim(),
+          bedrockApiKey: bedrockKeyInput || undefined,
+          bedrockModel: bedrockModel.trim(),
+          bedrockRegion: bedrockRegion.trim(),
+        };
+      case "openrouter":
+        return {
+          ...base,
+          openrouterBaseUrl: openrouterBaseUrl.trim(),
+          openrouterApiKey: openrouterKeyInput || undefined,
+          openrouterModel: openrouterModel.trim(),
+        };
+      default:
+        return base;
+    }
+  }
+
+  function buildTestPayload() {
+    switch (aiMode) {
+      case "gateway":
+        return {
+          provider: "gateway" as const,
+          bedrockBaseUrl: bedrockBaseUrl.trim(),
+          bedrockApiKey: bedrockKeyInput || undefined,
+          bedrockModel: bedrockModel.trim(),
+          bedrockRegion: bedrockRegion.trim(),
+        };
+      case "openrouter":
+        return {
+          provider: "openrouter" as const,
+          openrouterBaseUrl: openrouterBaseUrl.trim(),
+          openrouterApiKey: openrouterKeyInput || undefined,
+          openrouterModel: openrouterModel.trim(),
+        };
+      case "mock":
+        return { provider: "mock" as const };
+      default:
+        return {
+          provider: "anthropic" as const,
+          apiKey: keyInput || undefined,
+          model,
+        };
+    }
+  }
+
   async function saveKey() {
     setSavingKey(true);
     setKeyMsg(null);
     try {
-      const body =
-        aiMode === "bedrock"
-          ? {
-              bedrockBaseUrl: bedrockBaseUrl.trim(),
-              bedrockApiKey: bedrockKeyInput || undefined,
-              bedrockModel: bedrockModel.trim(),
-              bedrockRegion: bedrockRegion.trim(),
-            }
-          : {
-              anthropicApiKey: keyInput || undefined,
-              anthropicModel: model,
-            };
       const r = await fetch("/api/settings", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(buildProviderPayload()),
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error);
       setKeyInput("");
       setBedrockKeyInput("");
-      setKeyMsg("已保存。下一次调用 AI 时即时生效。");
+      setOpenrouterKeyInput("");
+      setKeyMsg(aiMode === "mock" ? "已切换为本地 Mock。" : "已保存。下一次调用 AI 时即时生效。");
       router.refresh();
     } catch (e) {
       setKeyMsg(`保存失败：${(e as Error).message}`);
@@ -106,47 +164,50 @@ export function SettingsForm({
     setTesting(true);
     setTestMsg(null);
     try {
-      const body =
-        aiMode === "bedrock"
-          ? {
-              provider: "bedrock" as const,
-              bedrockBaseUrl: bedrockBaseUrl.trim(),
-              bedrockApiKey: bedrockKeyInput || undefined,
-              bedrockModel: bedrockModel.trim(),
-              bedrockRegion: bedrockRegion.trim(),
-            }
-          : {
-              provider: "anthropic" as const,
-              apiKey: keyInput || undefined,
-              model,
-            };
       const r = await fetch("/api/settings/test-anthropic", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(buildTestPayload()),
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error);
-      setTestMsg(`✓ 连通 · ${j.data.model} 回复：${j.data.output.slice(0, 40)}`);
+      setTestMsg(`连通 · ${j.data.model} 回复：${j.data.output.slice(0, 40)}`);
     } catch (e) {
-      setTestMsg(`✗ ${(e as Error).message}`);
+      setTestMsg(`${(e as Error).message}`);
     } finally {
       setTesting(false);
     }
   }
 
   async function clearKey() {
-    if (!confirm(`确定清空已保存的 ${aiMode === "bedrock" ? "Bedrock" : "Anthropic"} 配置？`)) return;
-    const body =
-      aiMode === "bedrock"
-        ? { bedrockApiKey: "", bedrockBaseUrl: "", bedrockModel: "", bedrockRegion: "" }
-        : { anthropicApiKey: "" };
+    const label = AI_PROVIDER_OPTIONS.find((o) => o.id === aiMode)?.label ?? aiMode;
+    if (aiMode === "mock") return;
+    if (!confirm(`确定清空「${label}」已保存的配置？`)) return;
+
+    const clearBody: Partial<AppSettings> = { aiProvider: "mock" };
+    if (aiMode === "gateway") {
+      Object.assign(clearBody, {
+        bedrockApiKey: "",
+        bedrockBaseUrl: "",
+        bedrockModel: "",
+        bedrockRegion: "",
+      });
+    } else if (aiMode === "openrouter") {
+      Object.assign(clearBody, {
+        openrouterApiKey: "",
+        openrouterModel: "",
+        openrouterBaseUrl: "",
+      });
+    } else {
+      clearBody.anthropicApiKey = "";
+    }
+
     await fetch("/api/settings", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(clearBody),
     });
-    setKeyMsg("已清空。当前回落到 mock provider（若 env 无配置）。");
+    setKeyMsg("已清空，当前回落到本地 Mock。");
     router.refresh();
   }
 
@@ -160,157 +221,216 @@ export function SettingsForm({
   }
 
   const hasSavedKey =
-    aiMode === "bedrock" ? !!initialSettings.bedrockApiKeyMasked : !!initialSettings.anthropicApiKeyMasked;
-  const activeProvider = provider !== "mock";
+    aiMode === "gateway"
+      ? !!initialSettings.bedrockApiKeyMasked
+      : aiMode === "openrouter"
+        ? !!initialSettings.openrouterApiKeyMasked
+        : aiMode === "anthropic"
+          ? !!initialSettings.anthropicApiKeyMasked
+          : false;
+
+  const isActive = activeProvider !== "mock";
 
   return (
     <div className="space-y-8 max-w-3xl">
-      {/* —— API 接入 —— */}
-      <section className="surface p-6 space-y-4">
-        <header className="flex items-center justify-between">
+      <section className="surface p-6 space-y-5">
+        <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="label-eyebrow">API · AI Provider</div>
-            <h2 className="display-2 mt-1">接入 Claude</h2>
-            <p className="text-sm text-ink-500 mt-2">
-              支持小红书 MaaS Bedrock 代理或 Anthropic 直连。配置后，JD 解析 / 简历优化 / 面试准备均由模型生成；不填则使用本地 mock。
+            <div className="label-eyebrow">API · AI</div>
+            <h2 className="display-2 mt-1">模型接入</h2>
+            <p className="text-sm text-ink-500 mt-2 max-w-xl">
+              选择一种接入方式并保存。JD 解析、简历优化、面试准备等均走所选模型；未配置密钥时使用本地 Mock。
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <span
-              className={clsx(
-                "h-2 w-2 rounded-full",
-                activeProvider ? "bg-clay-400" : "bg-ink-200",
-              )}
+              className={clsx("h-2 w-2 rounded-full", isActive ? "bg-clay-400" : "bg-ink-200")}
             />
-            <span className="text-xs text-ink-500">当前：{provider}</span>
+            <span className="text-xs text-ink-500">当前生效：{activeProviderLabel}</span>
           </div>
         </header>
 
-        <div>
-          <div className="field-label mb-2">接入方式</div>
-          <div className="flex gap-2">
-            {(
-              [
-                { id: "bedrock" as const, label: "小红书 Bedrock（MaaS）" },
-                { id: "anthropic" as const, label: "Anthropic 直连" },
-              ] as const
-            ).map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setAiMode(m.id)}
-                className={clsx(
-                  "px-3 py-1.5 rounded-full text-xs border transition",
-                  aiMode === m.id
-                    ? "bg-ink-700 text-ivory-50 border-ink-700"
-                    : "border-ink-100 text-ink-500 hover:border-ink-200",
+        <div className="grid sm:grid-cols-2 gap-2">
+          {AI_PROVIDER_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setAiMode(opt.id)}
+              className={clsx(
+                "text-left p-4 rounded-xl border transition",
+                aiMode === opt.id
+                  ? "border-ink-700 bg-ink-700/5 ring-1 ring-ink-700"
+                  : "border-ink-100 hover:border-ink-200",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-ink-800">{opt.label}</span>
+                {activeProvider === opt.id && (
+                  <span className="text-[10px] uppercase tracking-wide text-clay-600">生效中</span>
                 )}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+              </div>
+              <p className="text-xs text-ink-500 mt-1">{opt.hint}</p>
+            </button>
+          ))}
         </div>
 
-        {aiMode === "bedrock" ? (
-          <>
-            <Lbl label="BEDROCK_BASE_URL">
-              <input
-                className="input"
-                placeholder="https://maas.devops.rednote.life/cowork/"
-                value={bedrockBaseUrl}
-                onChange={(e) => setBedrockBaseUrl(e.target.value)}
-              />
-            </Lbl>
+        <div className="border-t border-ink-100 pt-5 space-y-4">
+          {aiMode === "mock" && (
+            <p className="text-sm text-ink-500">
+              本地 Mock 使用规则与模板生成内容，不消耗 API 额度，适合离线或调试。保存后即可生效。
+            </p>
+          )}
 
-            <Lbl label="BEDROCK_API_KEY">
-              <div className="flex gap-2">
-                <input
-                  className="input"
-                  type={showBedrockKey ? "text" : "password"}
+          {aiMode === "anthropic" && (
+            <>
+              <Lbl label="API Key">
+                <SecretInput
+                  show={showKey}
+                  onToggle={() => setShowKey((v) => !v)}
                   placeholder={
-                    initialSettings.bedrockApiKeyMasked
-                      ? `已保存 · ${initialSettings.bedrockApiKeyMasked}（输入新值会替换）`
-                      : "MAAS…"
+                    initialSettings.anthropicApiKeyMasked
+                      ? `已保存 · ${initialSettings.anthropicApiKeyMasked}`
+                      : "sk-ant-…"
                   }
-                  value={bedrockKeyInput}
-                  onChange={(e) => setBedrockKeyInput(e.target.value)}
+                  value={keyInput}
+                  onChange={setKeyInput}
                 />
-                <button
-                  className="btn-quiet text-xs"
-                  type="button"
-                  onClick={() => setShowBedrockKey((v) => !v)}
-                >
-                  {showBedrockKey ? "隐藏" : "显示"}
-                </button>
-              </div>
-            </Lbl>
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Lbl label="模型 ID">
-                <select
-                  className="input"
-                  value={bedrockModel}
-                  onChange={(e) => setBedrockModel(e.target.value)}
-                >
-                  {BEDROCK_MODELS.map((m) => (
+              </Lbl>
+              <Lbl label="模型">
+                <select className="input" value={model} onChange={(e) => setModel(e.target.value)}>
+                  {ANTHROPIC_MODELS.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.label}
                     </option>
                   ))}
                 </select>
               </Lbl>
-              <Lbl label="AWS Region">
+            </>
+          )}
+
+          {aiMode === "gateway" && (
+            <>
+              <Lbl label="网关类型">
+                <div className="flex flex-wrap gap-2">
+                  {GATEWAY_PRESETS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => applyGatewayPreset(p.id)}
+                      className={clsx(
+                        "px-3 py-1.5 rounded-full text-xs border transition",
+                        gatewayPreset === p.id
+                          ? "bg-ink-700 text-ivory-50 border-ink-700"
+                          : "border-ink-100 text-ink-500 hover:border-ink-200",
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </Lbl>
+
+              <Lbl label="Base URL">
                 <input
                   className="input"
-                  placeholder="ap-northeast-1"
-                  value={bedrockRegion}
-                  onChange={(e) => setBedrockRegion(e.target.value)}
+                  placeholder="https://your-gateway.example.com/cowork/"
+                  value={bedrockBaseUrl}
+                  onChange={(e) => setBedrockBaseUrl(e.target.value)}
                 />
               </Lbl>
-            </div>
-          </>
-        ) : (
-          <>
-            <Lbl label="ANTHROPIC_API_KEY">
-              <div className="flex gap-2">
-                <input
-                  className="input"
-                  type={showKey ? "text" : "password"}
+
+              <Lbl label="API Key">
+                <SecretInput
+                  show={showBedrockKey}
+                  onToggle={() => setShowBedrockKey((v) => !v)}
                   placeholder={
-                    initialSettings.anthropicApiKeyMasked
-                      ? `已保存 · ${initialSettings.anthropicApiKeyMasked}（输入新值会替换）`
-                      : "sk-ant-…"
+                    initialSettings.bedrockApiKeyMasked
+                      ? `已保存 · ${initialSettings.bedrockApiKeyMasked}`
+                      : "Bearer token…"
                   }
-                  value={keyInput}
-                  onChange={(e) => setKeyInput(e.target.value)}
+                  value={bedrockKeyInput}
+                  onChange={setBedrockKeyInput}
                 />
-                <button className="btn-quiet text-xs" type="button" onClick={() => setShowKey((v) => !v)}>
-                  {showKey ? "隐藏" : "显示"}
-                </button>
+              </Lbl>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Lbl label="模型 ID">
+                  <select
+                    className="input"
+                    value={bedrockModel}
+                    onChange={(e) => setBedrockModel(e.target.value)}
+                  >
+                    {GATEWAY_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </Lbl>
+                <Lbl label="Region（可选）">
+                  <input
+                    className="input"
+                    placeholder="ap-northeast-1"
+                    value={bedrockRegion}
+                    onChange={(e) => setBedrockRegion(e.target.value)}
+                  />
+                </Lbl>
               </div>
-            </Lbl>
+            </>
+          )}
 
-            <Lbl label="模型">
-              <select className="input" value={model} onChange={(e) => setModel(e.target.value)}>
-                {ANTHROPIC_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </Lbl>
-          </>
-        )}
+          {aiMode === "openrouter" && (
+            <>
+              <Lbl label="API Key">
+                <SecretInput
+                  show={showOpenrouterKey}
+                  onToggle={() => setShowOpenrouterKey((v) => !v)}
+                  placeholder={
+                    initialSettings.openrouterApiKeyMasked
+                      ? `已保存 · ${initialSettings.openrouterApiKeyMasked}`
+                      : "sk-or-…"
+                  }
+                  value={openrouterKeyInput}
+                  onChange={setOpenrouterKeyInput}
+                />
+              </Lbl>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Lbl label="模型">
+                  <select
+                    className="input"
+                    value={openrouterModel}
+                    onChange={(e) => setOpenrouterModel(e.target.value)}
+                  >
+                    {OPENROUTER_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </Lbl>
+                <Lbl label="API Base（可选）">
+                  <input
+                    className="input"
+                    placeholder="https://openrouter.ai/api/v1"
+                    value={openrouterBaseUrl}
+                    onChange={(e) => setOpenrouterBaseUrl(e.target.value)}
+                  />
+                </Lbl>
+              </div>
+            </>
+          )}
+        </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button className="btn-primary" disabled={savingKey} onClick={saveKey}>
-            {savingKey ? "保存中…" : "保存"}
+            {savingKey ? "保存中…" : "保存并启用"}
           </button>
-          <button className="btn-ghost" disabled={testing} onClick={testConnection}>
-            {testing ? "测试中…" : "测试连通"}
-          </button>
-          {hasSavedKey && (
+          {aiMode !== "mock" && (
+            <button className="btn-ghost" disabled={testing} onClick={testConnection}>
+              {testing ? "测试中…" : "测试连通"}
+            </button>
+          )}
+          {hasSavedKey && aiMode !== "mock" && (
             <button className="btn-quiet text-clay-600" onClick={clearKey}>
               清空配置
             </button>
@@ -318,13 +438,12 @@ export function SettingsForm({
         </div>
         {keyMsg && <p className="text-xs text-ink-500">{keyMsg}</p>}
         {testMsg && (
-          <p className={clsx("text-xs", testMsg.startsWith("✓") ? "text-clay-600" : "text-clay-700")}>
+          <p className={clsx("text-xs", testMsg.startsWith("连通") ? "text-clay-600" : "text-clay-700")}>
             {testMsg}
           </p>
         )}
       </section>
 
-      {/* —— 外观 —— */}
       <section className="surface p-6 space-y-5">
         <header>
           <div className="label-eyebrow">APPEARANCE</div>
@@ -386,7 +505,6 @@ export function SettingsForm({
         </button>
       </section>
 
-      {/* —— 数据 —— */}
       <section className="surface p-6 space-y-4">
         <header>
           <div className="label-eyebrow">DATA</div>
@@ -408,6 +526,35 @@ export function SettingsForm({
       <section className="surface-quiet p-5 text-xs text-ink-400">
         Recruit Copilot · 2027 Summer & Fall · 本地优先 · 数据不离开你的设备。
       </section>
+    </div>
+  );
+}
+
+function SecretInput({
+  value,
+  onChange,
+  placeholder,
+  show,
+  onToggle,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  show: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex gap-2">
+      <input
+        className="input"
+        type={show ? "text" : "password"}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button className="btn-quiet text-xs" type="button" onClick={onToggle}>
+        {show ? "隐藏" : "显示"}
+      </button>
     </div>
   );
 }

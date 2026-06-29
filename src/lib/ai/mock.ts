@@ -3,11 +3,18 @@
 
 import type {
   AiProvider,
+  MockVideoInterviewEvaluateInput,
+  MockVideoInterviewStartInput,
   ParsedEntry,
   ParsedJob,
   ResumeStructured,
 } from "./types";
 import type { ProfileModule } from "../types";
+import { inferIndustryFromText } from "../industries";
+import {
+  evaluateMockVideoInterviewHeuristic,
+  startMockVideoInterviewHeuristic,
+} from "./mock-video-interview";
 
 const CN_LOC = [
   "北京", "上海", "深圳", "广州", "杭州", "成都", "南京", "苏州", "武汉", "西安",
@@ -18,11 +25,11 @@ const EN_LOC = [
   "Tokyo", "Hong Kong", "Remote", "Mountain View", "Palo Alto",
 ];
 const INDUSTRIES: Record<string, string> = {
-  bank: "金融 / 银行", invest: "金融 / 投资", consult: "咨询",
-  software: "互联网 / 软件", data: "数据 / 算法", product: "产品",
-  marketing: "市场 / 品牌", design: "设计", research: "研究",
+  bank: "银行", invest: "资管", consult: "咨询",
+  software: "软件工程", data: "算法 / 数据", product: "互联网产品",
+  marketing: "市场 / 运营", design: "设计", research: "二级研究",
   hardware: "硬件 / 半导体", auto: "汽车 / 出行", bio: "生物 / 医疗",
-  energy: "能源 / 新能源", media: "媒体 / 文娱",
+  energy: "能源 / 新能源", media: "市场 / 运营",
 };
 
 function firstMatch(text: string, candidates: string[]): string | undefined {
@@ -31,6 +38,10 @@ function firstMatch(text: string, candidates: string[]): string | undefined {
 }
 
 function inferIndustry(text: string): string | undefined {
+  return inferIndustryFromText(text) ?? legacyInferIndustry(text);
+}
+
+function legacyInferIndustry(text: string): string | undefined {
   const lower = text.toLowerCase();
   if (/(bank|证券|securities|invest|fund|trading|资管)/i.test(text)) return INDUSTRIES.invest;
   if (/(consult|consulting|strategy|麦肯锡|bcg|bain|咨询)/i.test(text)) return INDUSTRIES.consult;
@@ -92,6 +103,10 @@ function extractKeywords(text: string): string[] {
     if (re.test(text)) hit.add(w);
   }
   return Array.from(hit).slice(0, 20);
+}
+
+function isDomesticTrack(application: { company: string; location?: string | null }): boolean {
+  return /[一-龥]/.test(application.company) || /北京|上海|深圳|广州|杭州|成都|南京|苏州|武汉|西安/.test(application.location ?? "");
 }
 
 export const mockProvider: AiProvider = {
@@ -168,45 +183,89 @@ export const mockProvider: AiProvider = {
     };
   },
 
-  async optimizeResume({ application, profileDocs, profileEntries }) {
-    void profileEntries;
+  async optimizeResume({ application, profileEntries = [] }) {
     const skillsFromJob = application.keywords ?? [];
-    const skillsFromMe = new Set(
-      profileDocs.flatMap((d) => d.structured?.skills ?? extractKeywords(d.content)),
+    const tagsFromMe = new Set(
+      profileEntries.flatMap((e) => [...(e.tags ?? []), ...(e.bullets ?? []).flatMap(extractKeywords)]),
     );
-    const match = skillsFromJob.filter((s) => skillsFromMe.has(s));
-    const miss = skillsFromJob.filter((s) => !skillsFromMe.has(s));
+    const match = skillsFromJob.filter((s) => tagsFromMe.has(s));
+    const miss = skillsFromJob.filter((s) => !tagsFromMe.has(s));
+    const topEntries = profileEntries
+      .filter((e) => e.module === "internship" || e.module === "project")
+      .slice(0, 4);
+    const picked = topEntries.slice(0, 5);
+    const domestic = isDomesticTrack(application);
     return [
       `# 简历优化建议 — ${application.company} · ${application.role}`,
       ``,
-      `> 当前为本地启发式输出（未配置 Anthropic API Key）。配置后将由 Claude 给出更细的逐条改写。`,
+      `## A. 中文版（面向国内公司）`,
+      `### 一、岗位画像与关键词命中`,
+      `- 岗位关键词（JD）：${skillsFromJob.slice(0, 8).join("、") || "—"}`,
+      `- 已命中能力：${match.length ? match.join("、") : "暂无明显命中，请补充项目证据"}`,
+      `- 优先补强：${miss.length ? miss.slice(0, 6).join("、") : "建议强化结果量化与影响范围表达"}`,
+      `- 风险点：当前表述偏“做过什么”，需改为“做到什么结果”。${domestic ? "并补充跨团队协作与执行闭环。" : ""}`,
       ``,
-      `## 1. JD 关键词命中`,
-      `- 已覆盖：${match.length ? match.join("、") : "（暂无明显命中）"}`,
-      `- 建议补强：${miss.length ? miss.join("、") : "（无）"}`,
+      `### 二、Bullet 逐条改写建议（含原文对照）`,
+      ...picked.flatMap((e) => {
+        const original = (e.bullets?.[0] ?? e.summary ?? "暂无可用原文").replace(/\s+/g, " ");
+        return [
+          `#### ${e.title}${e.org ? ` · ${e.org}` : ""}`,
+          `- 原文："${original}"`,
+          `- 问题：动作和结果不够具体，缺少量化与业务影响。`,
+          `- 改写建议：用“动作 + 方法 + 结果 + 影响”四段式重写，并嵌入关键词。`,
+          `- 可替代版本（1 行）：主导【核心动作】，通过【方法/模型】实现【量化结果】，支撑【业务影响】。`,
+          ``,
+        ];
+      }),
+      `### 三、一页简历重排建议（国内版）`,
+      `- 抬头：姓名 + 联系方式 + 目标岗位（与 ${application.role} 对齐）。`,
+      `- 教育：仅保留最有含金量信息（学校、学位、时间、GPA/排名可选）。`,
+      `- 核心经历（2-3 段）：优先放与岗位最相关的实习/项目。`,
+      `- 项目/交易经验：每段 3-4 条 bullet，控制在一页内。`,
+      `- 技能：仅保留与 JD 强相关项（例如 ${miss.slice(0, 3).join("、") || "行业研究、财务分析、沟通表达"}）。`,
+      `- 语言与补充：放页尾，避免挤占核心经历篇幅。`,
       ``,
-      `## 2. 建议的 Bullet 改写方向`,
-      `- 把"参与"改为"主导/独立完成"，并补一个量化数字（提升 X%、覆盖 N 用户、节省 H 小时）。`,
-      `- 每条 bullet 用 STAR（Situation-Task-Action-Result）压缩到一行半内。`,
-      `- 在最相关的两段经历中，显式出现 JD 中的「${miss.slice(0, 3).join("、") || "关键术语"}」。`,
+      `## B. English Version (for international applications)`,
+      `### 1) Fit Snapshot & Keyword Coverage`,
+      `- Target role keywords: ${skillsFromJob.slice(0, 8).join(", ") || "N/A"}.`,
+      `- Evidenced strengths: ${match.length ? match.join(", ") : "Need stronger evidence with quantified impact"}.`,
+      `- Priority gaps: ${miss.length ? miss.slice(0, 5).join(", ") : "Sharpen impact statements and ownership framing"}.`,
+      `- Positioning note: frame outcomes with ownership, scope, and measurable business results.`,
       ``,
-      `## 3. 个人 Profile 抽取概览`,
-      ...profileDocs.slice(0, 3).map(
-        (d) => `- **${d.title}**：${(d.structured?.summary ?? d.content).slice(0, 80)}…`,
-      ),
+      `### 2) Bullet-level Rewrites with Side-by-side Context`,
+      ...picked.flatMap((e) => {
+        const original = (e.bullets?.[0] ?? e.summary ?? "No source bullet").replace(/\s+/g, " ");
+        return [
+          `#### ${e.title}${e.org ? ` · ${e.org}` : ""}`,
+          `- Original: "${original}"`,
+          `- Gap: The statement describes activity but not quantified impact.`,
+          `- Rewrite Direction: Use action + method + metric + business outcome.`,
+          `- One-line Strong Version: Led [core initiative], applied [method], delivered [metric], and improved [business KPI].`,
+          ``,
+        ];
+      }),
+      `### 3) One-page Resume Structure (International Version)`,
+      `- Header: Name | Contact | LinkedIn (optional) | Target Function.`,
+      `- Education: concise and relevant; keep only high-signal details.`,
+      `- Experience: 2-3 most relevant experiences first; 3-4 impact bullets each.`,
+      `- Projects: include only if they add differentiated evidence.`,
+      `- Skills: focused list aligned to the job; remove generic tools.`,
+      `- Keep every bullet scannable in under two lines.`,
     ].join("\n");
   },
 
-  async prepareInterview({ application, profileDocs, sharedExperiences, profileEntries }) {
-    void profileEntries;
+  async prepareInterview({ application, sharedExperiences, profileEntries = [] }) {
     const relevantExp = sharedExperiences.filter(
       (e) => e.company.toLowerCase() === application.company.toLowerCase(),
     );
     const qBank = relevantExp.flatMap((e) => e.highlights ?? []).slice(0, 15);
+    const topEntries = profileEntries
+      .filter((e) => e.module === "internship" || e.module === "project")
+      .slice(0, 4);
     return [
       `# 面试准备 — ${application.company} · ${application.role}`,
       ``,
-      `> 当前为本地启发式输出（未配置 Anthropic API Key）。`,
+      `> 本地启发式输出。`,
       ``,
       `## 公司 / 岗位速读`,
       `- 行业：${application.industry ?? "—"}`,
@@ -219,7 +278,7 @@ export const mockProvider: AiProvider = {
         : "_暂无该公司面经，先去面经库上传几份。_",
       ``,
       `## 用你自己的经历串答案`,
-      ...profileDocs.slice(0, 4).map((d) => `- 可援引：${d.title}`),
+      ...topEntries.map((e) => `- **${e.title}**${e.org ? ` · ${e.org}` : ""}：${e.summary ?? "—"}`),
       ``,
       `## 建议的复盘清单`,
       `- [ ] 自我介绍 60s / 120s 双版本`,
@@ -227,6 +286,14 @@ export const mockProvider: AiProvider = {
       `- [ ] 用 STAR 准备 3 个项目深挖`,
       `- [ ] 反向提问 3 个`,
     ].join("\n");
+  },
+
+  async startMockVideoInterview(input: MockVideoInterviewStartInput) {
+    return startMockVideoInterviewHeuristic(input);
+  },
+
+  async evaluateMockVideoInterview(input: MockVideoInterviewEvaluateInput) {
+    return evaluateMockVideoInterviewHeuristic(input);
   },
 };
 

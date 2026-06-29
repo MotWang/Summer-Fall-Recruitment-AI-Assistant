@@ -5,13 +5,25 @@ import Anthropic from "@anthropic-ai/sdk";
 import type {
   AiProvider,
   InterviewPrepInput,
+  MockVideoInterviewEvaluateInput,
+  MockVideoInterviewEvaluation,
+  MockVideoInterviewSession,
+  MockVideoInterviewStartInput,
   ParsedEntry,
   ParsedExperience,
   ParsedJob,
   ResumeStructured,
 } from "./types";
 import { getAppSettings } from "../repo";
-import { bedrockConverse, isBedrockConfigured } from "./bedrock-client";
+import { bedrockConverse } from "./bedrock-client";
+import { openrouterChat } from "./openrouter-client";
+import { resolveActiveProviderId } from "./provider-routing";
+import { buildInterviewContext } from "./interview-context";
+import {
+  evaluateMockVideoInterviewHeuristic,
+  startMockVideoInterviewHeuristic,
+} from "./mock-video-interview";
+import { APPLICATION_INDUSTRIES } from "@/lib/industries";
 
 // 读取顺序：DB 设置 > 环境变量。Settings 页填入的 key 即时生效。
 function readKey(): string | undefined {
@@ -39,8 +51,12 @@ function client() {
 }
 
 async function textCall(system: string, user: string, maxTokens = 4096): Promise<string> {
-  if (isBedrockConfigured()) {
+  const route = resolveActiveProviderId();
+  if (route === "gateway") {
     return bedrockConverse({ system, user, maxTokens });
+  }
+  if (route === "openrouter") {
+    return openrouterChat({ system, user, maxTokens });
   }
   const c = client();
   const resp = await c.messages.create({
@@ -65,9 +81,11 @@ async function mdCall(system: string, user: string): Promise<string> {
   return textCall(system, user);
 }
 
-function providerName(): "bedrock" | "anthropic" {
-  return isBedrockConfigured() ? "bedrock" : "anthropic";
+function providerName() {
+  return resolveActiveProviderId();
 }
+
+const INDUSTRY_HINT = APPLICATION_INDUSTRIES.join("、");
 
 export const anthropicProvider: AiProvider = {
   get name() {
@@ -77,7 +95,7 @@ export const anthropicProvider: AiProvider = {
   async parseJobPosting({ url, text }) {
     return jsonCall<ParsedJob>(
       "你是招聘信息抽取助手。根据用户提供的 JD 原文（可能含网页噪声），抽取结构化字段。日期统一 yyyy-MM-dd。",
-      `URL: ${url ?? ""}\n---\n${text ?? ""}\n\n字段：company, role, industry, location, postedAt, deadline, salary, jdSummary, keywords (array of strings, ≤12)`,
+      `URL: ${url ?? ""}\n---\n${text ?? ""}\n\n字段：company, role, industry（从以下选一：${INDUSTRY_HINT}）, location, postedAt, deadline, salary, jdSummary, keywords (array of strings, ≤12)`,
     );
   },
 
@@ -116,28 +134,115 @@ export const anthropicProvider: AiProvider = {
     );
   },
 
-  async optimizeResume({ application, profileDocs }) {
-    const ctx = profileDocs
-      .map((d) => `### ${d.title}\n${d.content.slice(0, 1500)}`)
-      .join("\n\n");
+  async optimizeResume({ application, profileEntries = [] }) {
+    const bundle = buildInterviewContext({
+      application,
+      profileDocs: [],
+      profileEntries,
+      sharedExperiences: [],
+    });
     return mdCall(
-      "你是资深求职教练，请输出 Markdown 报告，先给出 JD 关键词覆盖度，再给逐条 bullet 改写建议（含量化方向），最后给出建议的 1 页简历结构。",
-      `# 目标岗位\n${application.company} · ${application.role}\n\nJD 摘要：${application.jdSummary ?? ""}\n关键词：${(application.keywords ?? []).join(", ")}\n\n# 候选人 Profile\n${ctx}`,
+      [
+        "你是顶级投行/咨询求职教练，请输出专业、可直接 read-through 的 Markdown。",
+        "要求输出双版本：中文版本 + English version。",
+        "重要：英文版本不能直译中文，必须按海外招聘语境重写。",
+        "重要：国内投递与海外投递标准不同，必须分别体现。",
+        "",
+        "强制结构（必须按此顺序，标题原样保留）：",
+        "## A. 中文版（面向国内公司）",
+        "### 一、岗位画像与关键词命中",
+        "- 4-6 条短 bullet，总结岗位核心能力与候选人匹配度。",
+        "- 强调国内招聘常见偏好：执行落地、业务协同、项目推进、稳定性、汇报链清晰。",
+        "",
+        "### 二、Bullet 逐条改写建议（含原文对照）",
+        "- 仅挑 4-6 条最关键经历。",
+        "- 每条使用以下子结构：",
+        "#### [经历标题]",
+        "- 原文：\"...\"",
+        "- 问题：...",
+        "- 改写建议：...",
+        "- 可替代版本（1 行）：...",
+        "",
+        "### 三、一页简历重排建议（国内版）",
+        "- 给出模块顺序 + 每个模块重点（5-8 条）。",
+        "",
+        "## B. English Version (for international applications)",
+        "### 1) Fit Snapshot & Keyword Coverage",
+        "- 4-6 concise bullets in natural business English.",
+        "- Emphasize global hiring expectations: ownership, measurable impact, problem solving, cross-functional influence.",
+        "",
+        "### 2) Bullet-level Rewrites with Side-by-side Context",
+        "- Pick 4-6 most relevant bullets.",
+        "- For each item include:",
+        "#### [Experience Title]",
+        "- Original:",
+        "- Gap:",
+        "- Rewrite Direction:",
+        "- One-line Strong Version:",
+        "",
+        "### 3) One-page Resume Structure (International Version)",
+        "- 5-8 bullets on section order and emphasis.",
+        "",
+        "输出约束：",
+        "- 禁止 emoji、icon、logo、花哨符号。",
+        "- 每条 bullet 控制在 1-2 行；必要时换行，不要一大段。",
+        "- 中英文都要简洁，总长度控制在 1200-1800 中文字符等效。",
+      ].join("\n"),
+      bundle.contextText,
     );
   },
 
-  async prepareInterview({ application, profileDocs, sharedExperiences }: InterviewPrepInput) {
-    const expCtx = sharedExperiences
-      .slice(0, 10)
-      .map((e) => `- (${e.company}/${e.role ?? "?"}) ${e.content.slice(0, 600)}`)
-      .join("\n");
-    const profCtx = profileDocs
-      .slice(0, 4)
-      .map((d) => `### ${d.title}\n${d.content.slice(0, 1200)}`)
-      .join("\n\n");
+  async prepareInterview({ application, profileEntries = [], sharedExperiences }: InterviewPrepInput) {
+    const bundle = buildInterviewContext({
+      application,
+      profileDocs: [],
+      profileEntries,
+      sharedExperiences,
+    });
     return mdCall(
-      "你是面试教练。输出 Markdown：先列高频题（按行为/技术/案例分组），再针对每题给候选人个性化答题骨架（基于其经历），最后给出反向提问建议。",
-      `# 岗位\n${application.company} · ${application.role}\n关键词：${(application.keywords ?? []).join(", ")}\nJD 摘要：${application.jdSummary ?? ""}\n\n# 面经参考\n${expCtx}\n\n# 候选人材料\n${profCtx}`,
+      "你是面试教练。输出 Markdown：①高频题（按行为/技术/案例分组）；②针对每题给候选人个性化答题骨架（必须基于其上面的 Profile 条目，引用具体经历）；③反向提问 3 条建议。",
+      bundle.contextText,
     );
+  },
+
+  async startMockVideoInterview(input: MockVideoInterviewStartInput) {
+    const route = resolveActiveProviderId();
+    if (route === "mock") {
+      return startMockVideoInterviewHeuristic(input);
+    }
+    const bundle = buildInterviewContext(input);
+    try {
+      return await jsonCall<MockVideoInterviewSession>(
+        "你是资深面试官。根据候选人材料与 JD，设计一场模拟视频面试脚本。输出 JSON，字段：sessionId(随机uuid字符串), company, role, interviewKind, round, interviewerPersona, openingScript, closingScript, contextSummary(简短), questions[{id,order,category, prompt, timeLimitSec, evaluationRubric, probeHints?}]。category 取 opening|behavioral|technical|case|culture|closing。questions 5-7 题，prompt 用面试官口语。",
+        `${bundle.contextText}\n\n面试轮次：${input.round ?? 1}，类型：${input.interviewKind ?? "technical"}`,
+      );
+    } catch {
+      return startMockVideoInterviewHeuristic(input);
+    }
+  },
+
+  async evaluateMockVideoInterview(input: MockVideoInterviewEvaluateInput) {
+    const route = resolveActiveProviderId();
+    if (route === "mock") {
+      return evaluateMockVideoInterviewHeuristic(input);
+    }
+    const bundle = buildInterviewContext({
+      application: input.application,
+      profileDocs: input.profileDocs ?? [],
+      profileEntries: input.profileEntries,
+      sharedExperiences: [],
+    });
+    const payload = {
+      session: input.session,
+      answers: input.answers,
+    };
+    try {
+      return await jsonCall<MockVideoInterviewEvaluation>(
+        "你是面试评估官。根据题目、评分标准与候选人回答文本，输出 JSON：sessionId, overallScore(0-100), dimensions{relevance,structure,depth,communication,roleFit}, questionEvaluations[{questionId,score,strengths[],improvements[],sampleAnswerOutline}], summary, topImprovements[], passLikelihood(low|medium|high)。",
+        `${bundle.contextText}\n\n# 面试脚本与作答\n${JSON.stringify(payload).slice(0, 12000)}`,
+      );
+    } catch {
+      return evaluateMockVideoInterviewHeuristic(input);
+    }
   },
 };

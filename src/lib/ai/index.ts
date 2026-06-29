@@ -1,41 +1,28 @@
 import { mockProvider } from "./mock";
-import { getAppSettings } from "../repo";
-import { isBedrockConfigured } from "./bedrock-client";
+import { resolveActiveProviderId } from "./provider-routing";
 import type { AiProvider } from "./types";
+import type { AiProviderId } from "../types";
 
 /**
  * 每次按需选择 provider（不缓存）：
- *  - 优先 Bedrock（DB 设置或 env BEDROCK_*）
- *  - 否则 Anthropic（DB 设置或 env ANTHROPIC_API_KEY）
- *  - 都没有就 mock
- *
- * 不缓存是关键：设置页改 key 必须即时生效。
+ * 由设置页 aiProvider + 对应凭证决定；未配置则 mock。
  */
 export function getProvider(): AiProvider {
-  let hasKey = isBedrockConfigured();
-  if (!hasKey) {
-    try {
-      const s = getAppSettings();
-      if (s.anthropicApiKey && s.anthropicApiKey.trim()) hasKey = true;
-    } catch {
-      // ignore
-    }
+  if (resolveActiveProviderId() === "mock") {
+    return mockProvider;
   }
-  if (!hasKey && process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim()) {
-    hasKey = true;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require("./anthropic") as typeof import("./anthropic");
+    return mod.anthropicProvider;
+  } catch (e) {
+    console.warn("[ai] failed to load provider, fallback to mock:", e);
+    return mockProvider;
   }
-  if (hasKey) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mod = require("./anthropic") as typeof import("./anthropic");
-      return mod.anthropicProvider;
-    } catch (e) {
-      console.warn("[ai] failed to load anthropic provider, fallback to mock:", e);
-    }
-  }
-  return mockProvider;
 }
 
-export function providerName(): "anthropic" | "bedrock" | "mock" {
+export function providerName(): AiProviderId {
   return getProvider().name;
 }
+
+export { providerDisplayName, resolveActiveProviderId, isProviderConfigured } from "./provider-routing";

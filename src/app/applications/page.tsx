@@ -18,7 +18,7 @@ export default function ApplicationsPage({
   return (
     <div>
       <SectionTitle
-        eyebrow="02 · APPLICATIONS"
+        eyebrow="投递"
         title="投递看板"
         subtitle="一张表格，所有岗位一目了然。点击状态 pill 即时切换；顶部解析栏把 JD → 入库压缩为一步。"
       />

@@ -30,6 +30,7 @@ type AppRow = {
   keywords: string | null;
   salary: string | null;
   notes: string | null;
+  resume_variant: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -53,6 +54,7 @@ function rowToApp(r: AppRow): Application {
     keywords: r.keywords ? safeJson<string[]>(r.keywords, []) : [],
     salary: r.salary,
     notes: r.notes,
+    resumeVariant: (r.resume_variant as Application["resumeVariant"]) ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -64,6 +66,18 @@ function safeJson<T>(s: string | null, fallback: T): T {
     return JSON.parse(s) as T;
   } catch {
     return fallback;
+  }
+}
+
+function safeStringArray(s: string | null): string[] {
+  if (!s) return [];
+  try {
+    const v = JSON.parse(s) as unknown;
+    if (Array.isArray(v)) return v.map(String).filter(Boolean);
+    if (typeof v === "string" && v.trim()) return [v.trim()];
+    return [];
+  } catch {
+    return s.trim() ? [s.trim()] : [];
   }
 }
 
@@ -99,17 +113,18 @@ export function createApplication(input: Partial<Application> & { company: strin
   db.prepare(
     `INSERT INTO applications
       (id, company, role, industry, location, season, status, posted_at, deadline, applied_at,
-       source_url, source_type, jd_raw, jd_summary, keywords, salary, notes, created_at, updated_at)
+       source_url, source_type, jd_raw, jd_summary, keywords, salary, notes, resume_variant, created_at, updated_at)
      VALUES
       (@id, @company, @role, @industry, @location, @season, @status, @posted_at, @deadline, @applied_at,
-       @source_url, @source_type, @jd_raw, @jd_summary, @keywords, @salary, @notes, @created_at, @updated_at)`
+       @source_url, @source_type, @jd_raw, @jd_summary, @keywords, @salary, @notes, @resume_variant, @created_at, @updated_at)`
   ).run({
     id,
     company: input.company,
     role: input.role,
     industry: input.industry ?? null,
     location: input.location ?? null,
-    season: input.season ?? "summer-2027",
+    // season "": 表示 AI 推断不出，留空交用户。空字符串原样落库。
+    season: input.season ?? "",
     status: input.status ?? "wishlist",
     posted_at: input.postedAt ?? null,
     deadline: input.deadline ?? null,
@@ -121,6 +136,7 @@ export function createApplication(input: Partial<Application> & { company: strin
     keywords: input.keywords ? JSON.stringify(input.keywords) : null,
     salary: input.salary ?? null,
     notes: input.notes ?? null,
+    resume_variant: input.resumeVariant ?? null,
     created_at: now,
     updated_at: now,
   });
@@ -138,6 +154,7 @@ export function updateApplication(id: string, patch: Partial<Application>): Appl
        posted_at=@posted_at, deadline=@deadline, applied_at=@applied_at,
        source_url=@source_url, source_type=@source_type,
        jd_raw=@jd_raw, jd_summary=@jd_summary, keywords=@keywords, salary=@salary, notes=@notes,
+       resume_variant=@resume_variant,
        updated_at=@updated_at
      WHERE id=@id`
   ).run({
@@ -158,6 +175,7 @@ export function updateApplication(id: string, patch: Partial<Application>): Appl
     keywords: merged.keywords ? JSON.stringify(merged.keywords) : null,
     salary: merged.salary ?? null,
     notes: merged.notes ?? null,
+    resume_variant: merged.resumeVariant ?? null,
     updated_at: merged.updatedAt,
   });
   return getApplication(id);
@@ -388,7 +406,7 @@ function rowToExp(r: ExpRow): SharedExperience {
     stage: r.stage,
     applicationId: r.application_id,
     content: r.content,
-    highlights: r.highlights ? safeJson<string[]>(r.highlights, []) : [],
+    highlights: safeStringArray(r.highlights),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -521,6 +539,11 @@ export function listAiArtifacts(applicationId?: string): AiArtifact[] {
         .all(applicationId) as ArtRow[])
     : (db.prepare("SELECT * FROM ai_artifacts ORDER BY created_at DESC").all() as ArtRow[]);
   return rows.map(rowToArt);
+}
+
+export function getAiArtifact(id: string): AiArtifact | null {
+  const r = getDb().prepare("SELECT * FROM ai_artifacts WHERE id = ?").get(id) as ArtRow | undefined;
+  return r ? rowToArt(r) : null;
 }
 
 export function createAiArtifact(input: Omit<AiArtifact, "id" | "createdAt">): AiArtifact {

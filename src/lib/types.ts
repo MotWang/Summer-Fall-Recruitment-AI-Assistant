@@ -19,7 +19,37 @@ export const APPLICATION_STATUSES: ApplicationStatus[] = [
   "withdrawn",
 ];
 
-export type Season = "summer-2027" | "fall-2026" | "other";
+/** 招聘季节
+ *  - summer-2027   2027 暑期实习
+ *  - fall-2026     2026 秋招（毕业生校招）
+ *  - spring-2027   2027 春招 / 补录
+ *  - daily         日常 / 不分批的社招
+ *  - other         其他
+ *  - "" 空字符串    无法判断 — 交给用户手动选
+ */
+export type Season =
+  | "summer-2027"
+  | "fall-2026"
+  | "spring-2027"
+  | "daily"
+  | "other"
+  | "";
+
+export const APPLICATION_SEASONS: Exclude<Season, "">[] = [
+  "summer-2027",
+  "fall-2026",
+  "spring-2027",
+  "daily",
+  "other",
+];
+
+export const SEASON_LABEL: Record<Exclude<Season, "">, string> = {
+  "summer-2027": "暑期 2027",
+  "fall-2026": "秋招 2026",
+  "spring-2027": "春招 2027",
+  daily: "日常",
+  other: "其他",
+};
 
 export type InterviewKind =
   | "online_assessment"
@@ -33,6 +63,7 @@ export type InterviewKind =
   | "other";
 
 export type InterviewOutcome = "pending" | "passed" | "failed" | "cancelled";
+export type ResumeVariant = "cn" | "en";
 
 export interface Application {
   id: string;
@@ -49,13 +80,15 @@ export interface Application {
   /** 自己实际投递的时间 ISO */
   appliedAt?: string | null;
   sourceUrl?: string | null;
-  sourceType?: "url" | "text" | "pdf" | "manual" | null;
+  sourceType?: "url" | "text" | "pdf" | "docx" | "manual" | null;
   jdRaw?: string | null;
   jdSummary?: string | null;
   /** AI 提取的技能/关键词 — JSON array of string */
   keywords?: string[];
   salary?: string | null;
   notes?: string | null;
+  /** 当前岗位默认使用的简历版本（中文/英文） */
+  resumeVariant?: ResumeVariant | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -128,21 +161,24 @@ export interface SharedExperience {
 // —— Profile 模块化条目 ——
 
 export type ProfileModule =
-  | "basic"        // 基本信息
-  | "internship"   // 实习经历
+  | "basic"        // 个人基本信息（姓名/联系方式/简介）
+  | "skill"        // 核心技能 / 语言 / 兴趣
+  | "education"    // 教育经历（学校 / 学位 / GPA）
+  | "internship"   // 实习 / 工作经历
   | "project"      // 项目经历
-  | "campus"       // 校内 / 学生活动
-  | "award"        // 获奖与证书
-  | "skill"        // 技能 / 语言 / 兴趣
-  | "reflection";  // 感悟 / 学习笔记
+  | "campus"       // 校园 / 课外活动
+  | "award"        // 获奖 / 证书
+  | "reflection";  // 其他经历 / 感悟
 
+/** LinkedIn 风格固定渲染顺序 */
 export const PROFILE_MODULES: ProfileModule[] = [
   "basic",
+  "skill",
+  "education",
   "internship",
   "project",
   "campus",
   "award",
-  "skill",
   "reflection",
 ];
 
@@ -169,14 +205,21 @@ export interface ProfileEntry {
 
 // —— 应用设置（持久化在 SQLite 的 app_settings 表）——
 
+export type AiProviderId = "anthropic" | "gateway" | "openrouter" | "mock";
+
 export interface AppSettings {
+  /** 用户选择的 AI 接入方式 */
+  aiProvider?: AiProviderId;
   anthropicApiKey?: string;
   anthropicModel?: string;
-  /** 小红书 MaaS / AWS Bedrock 代理 */
+  /** Bedrock / MaaS 等 Claude 兼容网关 */
   bedrockBaseUrl?: string;
   bedrockApiKey?: string;
   bedrockModel?: string;
   bedrockRegion?: string;
+  openrouterApiKey?: string;
+  openrouterModel?: string;
+  openrouterBaseUrl?: string;
   /** 主题 */
   theme?: "light" | "dark" | "system";
   /** 强调色 */
@@ -187,7 +230,7 @@ export interface AiArtifact {
   id: string;
   applicationId?: string | null;
   /** 输出类型 */
-  kind: "resume_tailor" | "interview_prep" | "jd_summary" | "experience_brief";
+  kind: "resume_tailor" | "interview_prep" | "jd_summary" | "experience_brief" | "mock_interview_session" | "mock_interview_evaluation";
   title: string;
   inputRef?: string | null;
   /** Markdown */

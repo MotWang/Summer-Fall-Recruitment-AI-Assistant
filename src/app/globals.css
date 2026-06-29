@@ -62,11 +62,21 @@ body {
 }
 
 body {
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter",
-    "PingFang SC", "Hiragino Sans GB", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, "Inter",
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* 中文段落基础间距 */
+  font-size: 15px;
+  line-height: 1.55;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
+
+/* 强制中文 / 长 URL 不溢出容器 */
+table, td, th { word-break: break-word; overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; word-break: break-word; }
 
 ::selection {
   background: color-mix(in srgb, var(--accent) 25%, transparent);
@@ -74,20 +84,24 @@ body {
 
 /* —— 通用组件类 —— */
 @layer components {
+  /* —— App 感容器：圆角更软、阴影更轻 —— */
   .surface {
-    @apply bg-ivory-50 border border-ink-100 rounded-2xl;
+    @apply bg-ivory-50 border border-ink-100;
+    border-radius: 18px;
   }
   .surface-quiet {
-    @apply bg-transparent border border-ink-100 rounded-2xl;
+    @apply bg-transparent border border-ink-100;
+    border-radius: 18px;
   }
   .pill {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[12px] font-medium rounded-full border whitespace-nowrap;
   }
   .field-label {
-    @apply text-[11px] uppercase tracking-[0.14em] text-ink-300 font-medium;
+    /* 不再全大写，避免人机感太重 */
+    @apply text-[12px] text-ink-400 font-medium;
   }
   .input {
-    @apply w-full bg-ivory-50 border border-ink-100 rounded-xl px-3.5 py-2.5 text-sm
+    @apply w-full bg-ivory-50 border border-ink-100 rounded-[12px] px-3.5 py-2.5 text-[14px]
            text-ink-700 placeholder:text-ink-300
            focus:outline-none focus:border-ink-300 focus:ring-2 focus:ring-ink-200/40
            transition;
@@ -96,7 +110,7 @@ body {
     @apply input min-h-[120px] resize-y leading-relaxed;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium
+    @apply inline-flex items-center justify-center gap-2 rounded-[12px] px-3.5 py-2 text-[14px] font-medium
            border border-transparent transition select-none disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
@@ -114,14 +128,16 @@ body {
   .link {
     @apply text-ink-500 underline decoration-ink-200 underline-offset-2 hover:text-clay-500 hover:decoration-clay-300;
   }
+  /* 主标题：明显小一档，使用更现代的 system font 而非 serif，给"App 感" */
   .display-1 {
-    @apply font-serif text-[42px] leading-[1.1] tracking-tightish text-ink-800;
+    @apply font-sans text-[28px] sm:text-[32px] leading-[1.2] tracking-tightish text-ink-800 font-semibold;
   }
   .display-2 {
-    @apply font-serif text-[26px] leading-[1.15] tracking-tightish text-ink-800;
+    @apply font-sans text-[20px] sm:text-[22px] leading-[1.25] tracking-tightish text-ink-800 font-semibold;
   }
+  /* 章节小标：不再全大写。需要"原始 anthropic 风格"的地方仍可手动 uppercase */
   .label-eyebrow {
-    @apply text-[11px] uppercase tracking-[0.18em] text-ink-300 font-medium;
+    @apply text-[12px] tracking-wide text-ink-400 font-medium;
   }
 }
 

@@ -31,15 +31,23 @@ export function SectionTitle({
   subtitle?: string;
   right?: React.ReactNode;
 }) {
+  // 提取 eyebrow 末段（去掉 "02 · APPLICATIONS" 这种"编号 · 英文"，留中文）
+  const cleanEyebrow = eyebrow?.replace(/^[\d\s·\-]+/, "").replace(/^[A-Z\s]+·\s*/i, "");
   return (
-    <div className="flex items-end justify-between gap-6 mb-8 border-b border-ink-100 pb-6">
-      <div>
-        {eyebrow && <div className="label-eyebrow mb-3">{eyebrow}</div>}
-        <h1 className="display-1">{title}</h1>
-        {subtitle && <p className="mt-3 text-ink-400 max-w-2xl">{subtitle}</p>}
+    <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-0">
+        {cleanEyebrow && (
+          <div className="text-[12px] text-ink-400 font-medium mb-1.5">{cleanEyebrow}</div>
+        )}
+        <h1 className="display-1 break-words">{title}</h1>
+        {subtitle && (
+          <p className="mt-2 text-ink-500 text-[14px] leading-relaxed max-w-2xl break-words">
+            {subtitle}
+          </p>
+        )}
       </div>
       {right && <div className="shrink-0">{right}</div>}
-    </div>
+    </header>
   );
 }
 

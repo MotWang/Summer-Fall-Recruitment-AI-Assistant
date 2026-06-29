@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 function redact(s: AppSettings): AppSettings & {
   anthropicApiKeyMasked?: string | null;
   bedrockApiKeyMasked?: string | null;
+  openrouterApiKeyMasked?: string | null;
 } {
   const maskedAnthropic = s.anthropicApiKey
     ? `${s.anthropicApiKey.slice(0, 6)}…${s.anthropicApiKey.slice(-4)}`
@@ -16,12 +17,17 @@ function redact(s: AppSettings): AppSettings & {
   const maskedBedrock = s.bedrockApiKey
     ? `${s.bedrockApiKey.slice(0, 6)}…${s.bedrockApiKey.slice(-4)}`
     : null;
+  const maskedOpenRouter = s.openrouterApiKey
+    ? `${s.openrouterApiKey.slice(0, 6)}…${s.openrouterApiKey.slice(-4)}`
+    : null;
   return {
     ...s,
     anthropicApiKey: undefined,
     bedrockApiKey: undefined,
+    openrouterApiKey: undefined,
     anthropicApiKeyMasked: maskedAnthropic,
     bedrockApiKeyMasked: maskedBedrock,
+    openrouterApiKeyMasked: maskedOpenRouter,
   };
 }
 

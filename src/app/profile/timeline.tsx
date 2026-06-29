@@ -10,38 +10,59 @@ import {
 } from "@/lib/types";
 
 const MODULE_LABEL: Record<ProfileModule, string> = {
-  basic: "基本信息",
-  internship: "实习",
-  project: "项目",
-  campus: "校内 / 学生工作",
+  basic: "个人简介",
+  skill: "核心技能",
+  education: "教育经历",
+  internship: "实习 / 工作",
+  project: "项目经历",
+  campus: "校园 / 课外活动",
   award: "获奖 / 证书",
-  skill: "技能",
-  reflection: "感悟",
+  reflection: "其他经历",
 };
 
-const MODULE_COLOR: Record<ProfileModule, string> = {
-  basic: "bg-ink-200 text-ink-700",
-  internship: "bg-clay-100 text-clay-700",
-  project: "bg-clay-50 text-clay-600",
-  campus: "bg-ivory-300 text-ink-700",
-  award: "bg-clay-200 text-clay-700",
-  skill: "bg-ink-100 text-ink-600",
-  reflection: "bg-ivory-200 text-ink-500",
+const MODULE_HINT: Record<ProfileModule, string> = {
+  basic: "姓名、联系方式、一句话简介",
+  skill: "技术栈、语言、工具、兴趣",
+  education: "学校、学位、GPA、主修课程",
+  internship: "公司 · 岗位 · 时间 · 关键成果",
+  project: "项目名 · 角色 · 技术栈 · 量化结果",
+  campus: "社团、学生工作、志愿活动",
+  award: "竞赛、奖学金、证书",
+  reflection: "学习笔记、思考、其他可援引的经历",
+};
+
+const MODULE_ICON: Record<ProfileModule, string> = {
+  basic: "◐",
+  skill: "✦",
+  education: "▤",
+  internship: "▣",
+  project: "▰",
+  campus: "◇",
+  award: "★",
+  reflection: "✎",
 };
 
 export function ProfileTimeline({ entries }: { entries: ProfileEntry[] }) {
   const router = useRouter();
-  const [modFilter, setModFilter] = useState<ProfileModule | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<ProfileEntry | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creatingModule, setCreatingModule] = useState<ProfileModule | null>(null);
 
-  const filtered = useMemo(
-    () => (modFilter ? entries.filter((e) => e.module === modFilter) : entries),
-    [entries, modFilter],
-  );
+  const byModule = useMemo(() => {
+    const m = new Map<ProfileModule, ProfileEntry[]>();
+    for (const mod of PROFILE_MODULES) m.set(mod, []);
+    for (const e of entries) m.get(e.module)?.push(e);
+    // 时间倒序：present > yyyy-MM desc
+    for (const arr of m.values()) {
+      arr.sort((a, b) => {
+        const ak = (a.endDate === "present" ? "9999-99" : a.endDate ?? a.startDate ?? "") + a.updatedAt;
+        const bk = (b.endDate === "present" ? "9999-99" : b.endDate ?? b.startDate ?? "") + b.updatedAt;
+        return ak < bk ? 1 : ak > bk ? -1 : 0;
+      });
+    }
+    return m;
+  }, [entries]);
 
-  // 时间格式化：present 显示"至今"，否则 yyyy-MM
   function fmt(d?: string | null) {
     if (!d) return "—";
     if (d === "present") return "至今";
@@ -54,137 +75,72 @@ export function ProfileTimeline({ entries }: { entries: ProfileEntry[] }) {
     router.refresh();
   }
 
+  async function adopt(id: string) {
+    await fetch(`/api/profile-entries/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "active" }),
+    });
+    router.refresh();
+  }
+
+  // 顶部 hero：basic + skill
+  const basics = byModule.get("basic") ?? [];
+  const skills = byModule.get("skill") ?? [];
+  const profileName = basics[0]?.org ?? basics[0]?.title ?? null;
+
+  const totalDraft = entries.filter((e) => e.status === "draft").length;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* 顶部操作栏 */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setModFilter(null)}
-          className={clsx(
-            "px-3 py-1.5 rounded-full text-xs border transition",
-            !modFilter ? "bg-ink-700 text-ivory-50 border-ink-700" : "border-ink-100 text-ink-500 hover:border-ink-200",
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="text-sm text-ink-400">
+          共 {entries.length} 条
+          {totalDraft > 0 && (
+            <span className="ml-2 text-clay-600">· {totalDraft} 条 AI 草稿待确认</span>
           )}
-        >
-          全部 · {entries.length}
-        </button>
-        {PROFILE_MODULES.map((m) => {
-          const n = entries.filter((e) => e.module === m).length;
-          return (
-            <button
-              key={m}
-              onClick={() => setModFilter(m)}
-              className={clsx(
-                "px-3 py-1.5 rounded-full text-xs border transition",
-                modFilter === m
-                  ? "bg-ink-700 text-ivory-50 border-ink-700"
-                  : "border-ink-100 text-ink-500 hover:border-ink-200",
-              )}
-            >
-              {MODULE_LABEL[m]} · {n}
-            </button>
-          );
-        })}
-        <div className="ml-auto flex gap-2">
-          <button className="btn-ghost" onClick={() => setCreating(true)}>+ 手动添加</button>
+        </div>
+        <div className="flex gap-2">
+          <button className="btn-ghost" onClick={() => setCreatingModule("internship")}>
+            + 添加经历
+          </button>
           <button className="btn-accent" onClick={() => setImportOpen(true)}>
-            上传 CV (PDF / Word)
+            上传 CV
           </button>
         </div>
       </div>
 
-      {/* 时间轴 */}
-      {filtered.length === 0 ? (
-        <div className="surface-quiet p-10 text-center">
-          <div className="display-2 text-ink-500">还没有任何条目</div>
-          <p className="mt-3 text-ink-400 text-sm">
-            点 “上传 CV” 让 AI 自动拆分到对应模块，或手动添加一条。
-          </p>
-        </div>
-      ) : (
-        <ol className="relative pl-6 border-l border-ink-100 space-y-6">
-          {filtered.map((e) => (
-            <li key={e.id} className="relative">
-              <span className="absolute -left-[27px] top-2 h-2.5 w-2.5 rounded-full bg-clay-400 ring-4 ring-ivory-100" />
-              <article
-                className={clsx(
-                  "surface p-5",
-                  e.status === "draft" && "border-clay-200 bg-clay-50/40",
-                )}
-              >
-                <header className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span
-                        className={clsx(
-                          "pill text-[10px] border-transparent",
-                          MODULE_COLOR[e.module],
-                        )}
-                      >
-                        {MODULE_LABEL[e.module]}
-                      </span>
-                      {e.status === "draft" && (
-                        <span className="pill text-[10px] border-clay-200 bg-clay-50 text-clay-600">
-                          AI 草稿 · 待确认
-                        </span>
-                      )}
-                      <span className="text-[11px] text-ink-400">
-                        {fmt(e.startDate)} ~ {fmt(e.endDate)}
-                      </span>
-                    </div>
-                    <h3 className="font-serif text-lg text-ink-800">{e.title}</h3>
-                    {(e.org || e.role) && (
-                      <div className="text-sm text-ink-500 mt-0.5">
-                        {[e.org, e.role].filter(Boolean).join(" · ")}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button className="btn-quiet" onClick={() => setEditing(e)}>编辑</button>
-                    {e.status === "draft" && (
-                      <button
-                        className="btn-ghost"
-                        onClick={async () => {
-                          await fetch(`/api/profile-entries/${e.id}`, {
-                            method: "PATCH",
-                            headers: { "content-type": "application/json" },
-                            body: JSON.stringify({ status: "active" }),
-                          });
-                          router.refresh();
-                        }}
-                      >
-                        采纳
-                      </button>
-                    )}
-                    <button className="btn-quiet text-clay-600" onClick={() => remove(e.id)}>删除</button>
-                  </div>
-                </header>
+      {/* —— Hero: 基本信息 + 技能 —— */}
+      <ProfileHero
+        basics={basics}
+        skills={skills}
+        name={profileName}
+        onEdit={setEditing}
+        onAdd={() => setCreatingModule("basic")}
+        onAddSkill={() => setCreatingModule("skill")}
+        onRemove={remove}
+        onAdopt={adopt}
+      />
 
-                {e.summary && <p className="mt-3 text-sm text-ink-600">{e.summary}</p>}
-                {e.bullets && e.bullets.length > 0 && (
-                  <ul className="mt-3 space-y-1.5 text-sm text-ink-600">
-                    {e.bullets.map((b, i) => (
-                      <li key={i} className="pl-3 relative">
-                        <span className="absolute left-0 top-2 h-1 w-1 rounded-full bg-ink-300" />
-                        {b}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {e.tags && e.tags.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {e.tags.map((t) => (
-                      <span key={t} className="pill text-[10px] border-ink-100 text-ink-500 bg-ivory-100">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </article>
-            </li>
-          ))}
-        </ol>
-      )}
+      {/* —— 各章节 —— */}
+      {PROFILE_MODULES.filter((m) => m !== "basic" && m !== "skill").map((mod) => {
+        const items = byModule.get(mod) ?? [];
+        return (
+          <Section
+            key={mod}
+            module={mod}
+            items={items}
+            fmt={fmt}
+            onAdd={() => setCreatingModule(mod)}
+            onEdit={setEditing}
+            onRemove={remove}
+            onAdopt={adopt}
+          />
+        );
+      })}
 
+      {/* —— Dialogs —— */}
       {importOpen && (
         <CvImportDialog
           onClose={() => setImportOpen(false)}
@@ -194,11 +150,12 @@ export function ProfileTimeline({ entries }: { entries: ProfileEntry[] }) {
           }}
         />
       )}
-      {creating && (
+      {creatingModule && (
         <EntryEditor
-          onClose={() => setCreating(false)}
+          initialModule={creatingModule}
+          onClose={() => setCreatingModule(null)}
           onSaved={() => {
-            setCreating(false);
+            setCreatingModule(null);
             router.refresh();
           }}
         />
@@ -217,6 +174,230 @@ export function ProfileTimeline({ entries }: { entries: ProfileEntry[] }) {
   );
 }
 
+// —— Hero 区：基本信息 + 技能 ——
+
+function ProfileHero({
+  basics,
+  skills,
+  name,
+  onEdit,
+  onAdd,
+  onAddSkill,
+  onRemove,
+  onAdopt,
+}: {
+  basics: ProfileEntry[];
+  skills: ProfileEntry[];
+  name: string | null;
+  onEdit: (e: ProfileEntry) => void;
+  onAdd: () => void;
+  onAddSkill: () => void;
+  onRemove: (id: string) => void;
+  onAdopt: (id: string) => void;
+}) {
+  const allSkills = Array.from(
+    new Set(skills.flatMap((s) => s.tags ?? []).filter(Boolean)),
+  );
+
+  return (
+    <section className="surface p-6 sm:p-8">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="min-w-0">
+          <div className="label-eyebrow">{MODULE_LABEL.basic}</div>
+          <h2 className="font-serif text-2xl text-ink-800 mt-2 break-words">
+            {name ?? "尚未填写姓名"}
+          </h2>
+          {basics[0]?.summary && (
+            <p className="mt-2 text-ink-600 break-words leading-relaxed max-w-2xl">
+              {basics[0].summary}
+            </p>
+          )}
+          {basics[0]?.bullets && basics[0].bullets.length > 0 && (
+            <ul className="mt-3 grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-ink-500">
+              {basics[0].bullets.map((b, i) => (
+                <li key={i} className="break-words">{b}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="flex flex-col gap-1.5 shrink-0">
+          {basics[0] ? (
+            <button className="btn-quiet text-xs" onClick={() => onEdit(basics[0])}>编辑</button>
+          ) : (
+            <button className="btn-quiet text-xs" onClick={onAdd}>+ 填写</button>
+          )}
+        </div>
+      </div>
+
+      {/* 技能行 */}
+      <div className="mt-6 pt-5 border-t border-ink-100">
+        <div className="flex items-center justify-between mb-3">
+          <div className="label-eyebrow">{MODULE_LABEL.skill}</div>
+          <button className="btn-quiet text-xs" onClick={onAddSkill}>+ 添加</button>
+        </div>
+        {allSkills.length === 0 ? (
+          <p className="text-ink-300 text-sm">未填写。</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {allSkills.map((s) => (
+              <span key={s} className="pill border-ink-100 text-ink-500 bg-ivory-100">
+                {s}
+              </span>
+            ))}
+          </div>
+        )}
+        {/* 多张 skill entry 卡（很少见，但允许） */}
+        {skills.length > 1 && (
+          <div className="mt-4 grid sm:grid-cols-2 gap-3">
+            {skills.map((s) => (
+              <div key={s.id} className="border border-ink-100 rounded-2xl p-3 bg-ivory-100/40">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-sm font-medium text-ink-700 break-words min-w-0">{s.title}</span>
+                  <div className="flex gap-1 shrink-0">
+                    <button className="btn-quiet text-xs" onClick={() => onEdit(s)}>编辑</button>
+                    <button className="btn-quiet text-xs text-clay-600" onClick={() => onRemove(s.id)}>删除</button>
+                  </div>
+                </div>
+                {s.status === "draft" && (
+                  <button className="btn-quiet text-[11px] text-clay-600" onClick={() => onAdopt(s.id)}>
+                    采纳草稿
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// —— 通用章节 ——
+
+function Section({
+  module: mod,
+  items,
+  fmt,
+  onAdd,
+  onEdit,
+  onRemove,
+  onAdopt,
+}: {
+  module: ProfileModule;
+  items: ProfileEntry[];
+  fmt: (d?: string | null) => string;
+  onAdd: () => void;
+  onEdit: (e: ProfileEntry) => void;
+  onRemove: (id: string) => void;
+  onAdopt: (id: string) => void;
+}) {
+  return (
+    <section>
+      <header className="flex items-baseline justify-between gap-4 mb-3 px-1">
+        <div className="flex items-baseline gap-3">
+          <span className="text-clay-500 text-lg leading-none">{MODULE_ICON[mod]}</span>
+          <h3 className="font-serif text-xl text-ink-800">{MODULE_LABEL[mod]}</h3>
+          <span className="text-xs text-ink-300">{items.length}</span>
+        </div>
+        <button className="btn-quiet text-xs" onClick={onAdd}>+ 添加</button>
+      </header>
+
+      {items.length === 0 ? (
+        <div className="surface-quiet p-5 text-center">
+          <p className="text-ink-300 text-sm">{MODULE_HINT[mod]}</p>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {items.map((e) => (
+            <li key={e.id}>
+              <EntryCard
+                entry={e}
+                fmt={fmt}
+                onEdit={() => onEdit(e)}
+                onRemove={() => onRemove(e.id)}
+                onAdopt={() => onAdopt(e.id)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function EntryCard({
+  entry: e,
+  fmt,
+  onEdit,
+  onRemove,
+  onAdopt,
+}: {
+  entry: ProfileEntry;
+  fmt: (d?: string | null) => string;
+  onEdit: () => void;
+  onRemove: () => void;
+  onAdopt: () => void;
+}) {
+  return (
+    <article
+      className={clsx(
+        "surface p-5 transition",
+        e.status === "draft" && "border-clay-200 bg-clay-50/40",
+      )}
+    >
+      <header className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h4 className="font-medium text-ink-800 text-base break-words">{e.title}</h4>
+          {(e.org || e.role) && (
+            <div className="text-sm text-ink-500 mt-0.5 break-words">
+              {[e.org, e.role].filter(Boolean).join(" · ")}
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-xs text-ink-400 mt-1 flex-wrap">
+            <span>{fmt(e.startDate)} ~ {fmt(e.endDate)}</span>
+            {e.location && <span>· {e.location}</span>}
+            {e.status === "draft" && (
+              <span className="pill text-[10px] border-clay-200 bg-clay-50 text-clay-600">
+                AI 草稿
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-1 shrink-0">
+          {e.status === "draft" && (
+            <button className="btn-quiet text-xs" onClick={onAdopt}>采纳</button>
+          )}
+          <button className="btn-quiet text-xs" onClick={onEdit}>编辑</button>
+          <button className="btn-quiet text-xs text-clay-600" onClick={onRemove}>删除</button>
+        </div>
+      </header>
+
+      {e.summary && (
+        <p className="mt-3 text-sm text-ink-600 break-words leading-relaxed">{e.summary}</p>
+      )}
+      {e.bullets && e.bullets.length > 0 && (
+        <ul className="mt-3 space-y-1.5 text-sm text-ink-600">
+          {e.bullets.map((b, i) => (
+            <li key={i} className="pl-3 relative break-words">
+              <span className="absolute left-0 top-2 h-1 w-1 rounded-full bg-ink-300" />
+              {b}
+            </li>
+          ))}
+        </ul>
+      )}
+      {e.tags && e.tags.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {e.tags.map((t) => (
+            <span key={t} className="pill text-[10px] border-ink-100 text-ink-500 bg-ivory-100">
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+    </article>
+  );
+}
+
 // —— CV 导入对话框：解析 + 合并决策 ——
 
 type SuggestionKind = "new" | "possible_duplicate" | "replace_or_merge";
@@ -230,7 +411,6 @@ interface ParsedRow {
     matchOrg?: string | null;
     similarity: number;
   };
-  // 用户选择：默认 add，重复时默认 review
   decision: "add" | "merge" | "replace" | "skip";
 }
 
@@ -255,9 +435,7 @@ function CvImportDialog({
     try {
       const isDocx = /\.docx$/i.test(f.name);
       const isPdf = /\.pdf$/i.test(f.name);
-      if (!isDocx && !isPdf) {
-        throw new Error("只支持 .pdf 或 .docx");
-      }
+      if (!isDocx && !isPdf) throw new Error("只支持 .pdf 或 .docx");
       const b64 = await readBase64(f);
       const r = await fetch("/api/profile-entries/import-cv", {
         method: "POST",
@@ -307,7 +485,6 @@ function CvImportDialog({
             body: JSON.stringify({ ...row.entry, status: "active" }),
           });
         } else if (row.decision === "merge" && row.suggestion.matchId) {
-          // 合并：把新 bullets / tags 追加到现有条目
           const existing = await fetch(`/api/profile-entries/${row.suggestion.matchId}`).then((r) => r.json());
           if (existing.ok) {
             const e: ProfileEntry = existing.data;
@@ -337,12 +514,12 @@ function CvImportDialog({
   return (
     <div className="fixed inset-0 z-30 bg-ink-700/30 backdrop-blur-sm flex items-center justify-center px-4">
       <div className="surface w-full max-w-4xl max-h-[88vh] overflow-hidden flex flex-col bg-ivory-50">
-        <header className="px-6 py-4 border-b border-ink-100 flex items-center justify-between">
-          <div>
-            <div className="label-eyebrow">IMPORT CV</div>
-            <h2 className="font-serif text-xl text-ink-800 mt-1">从 PDF / Word 导入</h2>
+        <header className="px-6 py-4 border-b border-ink-100 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="label-eyebrow">导入 CV</div>
+            <h2 className="font-serif text-xl text-ink-800 mt-1 break-words">从 PDF / Word 导入</h2>
           </div>
-          <button className="btn-quiet" onClick={onClose}>关闭</button>
+          <button className="btn-quiet shrink-0" onClick={onClose}>关闭</button>
         </header>
 
         <div className="px-6 py-5 flex-1 overflow-y-auto">
@@ -356,19 +533,19 @@ function CvImportDialog({
                 onChange={(e) => onFile(e.target.files?.[0] ?? null)}
               />
               <label htmlFor="cvpick" className="btn-accent cursor-pointer">
-                选择文件…
+                选择文件
               </label>
               <p className="text-xs text-ink-400 mt-3">
-                支持 .pdf / .docx。AI 会自动拆分到 实习 / 项目 / 校内 / 获奖 / 技能 等模块。
+                支持 .pdf / .docx。AI 会自动拆分到 教育 / 实习 / 项目 / 校园 / 获奖 / 技能 等模块。
               </p>
               {busy && <p className="text-sm text-clay-500 mt-3">解析中… {filename}</p>}
-              {err && <p className="text-sm text-clay-600 mt-3">{err}</p>}
+              {err && <p className="text-sm text-clay-600 mt-3 break-words">{err}</p>}
             </div>
           )}
 
           {rows && (
             <div>
-              <div className="text-xs text-ink-400 mb-4">
+              <div className="text-xs text-ink-400 mb-4 break-words">
                 文件：{filename} · provider: {provider} · 共解析出 {rows.length} 条
               </div>
               <ul className="space-y-3">
@@ -387,7 +564,7 @@ function CvImportDialog({
         </div>
 
         {rows && (
-          <footer className="px-6 py-4 border-t border-ink-100 flex items-center justify-between bg-ivory-100/60">
+          <footer className="px-6 py-4 border-t border-ink-100 flex items-center justify-between bg-ivory-100/60 gap-3 flex-wrap">
             <span className="text-xs text-ink-400">
               {rows.filter((r) => r.decision !== "skip").length} 条会写入
             </span>
@@ -414,18 +591,22 @@ function RowEditor({
   const { entry, suggestion } = row;
   const hasMatch = suggestion.kind !== "new";
   return (
-    <li className="border border-ink-100 rounded-xl p-4 bg-ivory-50">
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <div className="flex items-center gap-2">
+    <li className="border border-ink-100 rounded-2xl p-4 bg-ivory-50">
+      <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="pill text-[10px] border-ink-100 text-ink-500">{MODULE_LABEL[entry.module]}</span>
           {suggestion.kind === "new" && (
             <span className="pill text-[10px] border-clay-100 text-clay-600 bg-clay-50">新发现</span>
           )}
           {suggestion.kind === "possible_duplicate" && (
-            <span className="pill text-[10px] border-ink-100 text-ink-500">疑似重复 {(suggestion.similarity * 100).toFixed(0)}%</span>
+            <span className="pill text-[10px] border-ink-100 text-ink-500">
+              疑似重复 {(suggestion.similarity * 100).toFixed(0)}%
+            </span>
           )}
           {suggestion.kind === "replace_or_merge" && (
-            <span className="pill text-[10px] border-clay-200 text-clay-700 bg-clay-100">已存在条目 · 需要决策</span>
+            <span className="pill text-[10px] border-clay-200 text-clay-700 bg-clay-100">
+              已存在条目 · 需要决策
+            </span>
           )}
         </div>
         <select
@@ -442,10 +623,10 @@ function RowEditor({
         </select>
       </div>
 
-      <div className="text-sm">
-        <div className="font-medium text-ink-800">{entry.title}</div>
+      <div className="text-sm min-w-0">
+        <div className="font-medium text-ink-800 break-words">{entry.title}</div>
         {(entry.org || entry.role) && (
-          <div className="text-ink-500 text-xs mt-0.5">
+          <div className="text-ink-500 text-xs mt-0.5 break-words">
             {[entry.org, entry.role].filter(Boolean).join(" · ")}
           </div>
         )}
@@ -459,7 +640,7 @@ function RowEditor({
       {entry.bullets && entry.bullets.length > 0 && (
         <ul className="mt-2 space-y-1 text-xs text-ink-600">
           {entry.bullets.slice(0, 5).map((b, i) => (
-            <li key={i} className="pl-3 relative">
+            <li key={i} className="pl-3 relative break-words">
               <span className="absolute left-0 top-1.5 h-1 w-1 rounded-full bg-ink-300" />
               {b}
             </li>
@@ -468,7 +649,7 @@ function RowEditor({
       )}
 
       {hasMatch && (
-        <div className="mt-3 text-xs text-ink-400 border-t border-ink-100 pt-2">
+        <div className="mt-3 text-xs text-ink-400 border-t border-ink-100 pt-2 break-words">
           ↺ 已有条目：<span className="text-ink-600">{suggestion.matchTitle}</span>
           {suggestion.matchOrg && <span className="text-ink-500"> · {suggestion.matchOrg}</span>}
         </div>
@@ -486,20 +667,22 @@ function readBase64(f: File): Promise<string> {
   });
 }
 
-// —— 手动新增/编辑 ——
+// —— 手动新增 / 编辑 ——
 
 function EntryEditor({
   entry,
+  initialModule,
   onClose,
   onSaved,
 }: {
   entry?: ProfileEntry;
+  initialModule?: ProfileModule;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [draft, setDraft] = useState<Partial<ProfileEntry>>(
     entry ?? {
-      module: "internship",
+      module: initialModule ?? "internship",
       title: "",
       bullets: [],
       tags: [],
@@ -527,23 +710,21 @@ function EntryEditor({
   return (
     <div className="fixed inset-0 z-30 bg-ink-700/30 backdrop-blur-sm flex items-center justify-center px-4">
       <div className="surface w-full max-w-2xl bg-ivory-50 max-h-[88vh] overflow-y-auto">
-        <header className="px-6 py-4 border-b border-ink-100 flex items-center justify-between">
-          <h2 className="font-serif text-xl text-ink-800">{entry ? "编辑条目" : "新增条目"}</h2>
-          <button className="btn-quiet" onClick={onClose}>关闭</button>
+        <header className="px-6 py-4 border-b border-ink-100 flex items-center justify-between gap-4">
+          <h2 className="font-serif text-xl text-ink-800 min-w-0 break-words">
+            {entry ? "编辑条目" : `新增 · ${MODULE_LABEL[draft.module as ProfileModule]}`}
+          </h2>
+          <button className="btn-quiet shrink-0" onClick={onClose}>关闭</button>
         </header>
         <div className="px-6 py-5 grid sm:grid-cols-2 gap-3">
           <Lbl label="模块">
             <select
               className="input"
               value={draft.module ?? "internship"}
-              onChange={(e) =>
-                setDraft({ ...draft, module: e.target.value as ProfileModule })
-              }
+              onChange={(e) => setDraft({ ...draft, module: e.target.value as ProfileModule })}
             >
               {PROFILE_MODULES.map((m) => (
-                <option key={m} value={m}>
-                  {MODULE_LABEL[m]}
-                </option>
+                <option key={m} value={m}>{MODULE_LABEL[m]}</option>
               ))}
             </select>
           </Lbl>
@@ -554,14 +735,14 @@ function EntryEditor({
               onChange={(e) => setDraft({ ...draft, title: e.target.value })}
             />
           </Lbl>
-          <Lbl label="单位 / 组织">
+          <Lbl label="单位 / 学校 / 组织">
             <input
               className="input"
               value={draft.org ?? ""}
               onChange={(e) => setDraft({ ...draft, org: e.target.value })}
             />
           </Lbl>
-          <Lbl label="角色 / 职位">
+          <Lbl label="角色 / 学位">
             <input
               className="input"
               value={draft.role ?? ""}
@@ -594,7 +775,7 @@ function EntryEditor({
             </Lbl>
           </div>
           <div className="sm:col-span-2">
-            <Lbl label="bullets（每行一条）">
+            <Lbl label="详情 / Bullets（每行一条）">
               <textarea
                 className="textarea"
                 value={(draft.bullets ?? []).join("\n")}
@@ -632,7 +813,7 @@ function EntryEditor({
 
 function Lbl({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <div className="field-label mb-1">{label}</div>
       {children}
     </label>

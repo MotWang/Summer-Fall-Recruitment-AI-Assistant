@@ -4,9 +4,14 @@
   "private": true,
   "description": "2027 Summer & Fall Recruitment Assistant — 本地优先的投递、面试、简历与面经助手",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3055",
+    "dev:clean": "rm -rf .next && next dev -p 3055",
+    "prebuild": "node scripts/prebuild-check.mjs",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3055",
+    "serve": "node scripts/serve.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "restart": "node scripts/kill-port.mjs 3055 && node scripts/serve.mjs",
     "lint": "next lint",
     "db:reset": "node scripts/reset-db.mjs",
     "db:seed": "node scripts/seed.mjs"

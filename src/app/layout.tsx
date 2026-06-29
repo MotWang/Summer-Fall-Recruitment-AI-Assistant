@@ -24,6 +24,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-CN" data-theme={theme === "system" ? "light" : theme} data-accent={accent}>
       <head>
+        {/* 关键样式兜底：即使 _next/static/css 加载失败也不白屏 */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `html,body{margin:0;min-height:100%;background:#F5F4ED;color:#1F1E1B;}
+html[data-theme="dark"],html[data-theme="dark"] body{background:#131210;color:#ECEAE2;}`,
+          }}
+        />
         {/* 系统模式下用 prefers-color-scheme 同步覆盖（在 React hydrate 前先跑） */}
         <script
           dangerouslySetInnerHTML={{

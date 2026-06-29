@@ -43,6 +43,7 @@ function migrate(db: Database.Database) {
       keywords TEXT,
       salary TEXT,
       notes TEXT,
+      resume_variant TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -126,11 +127,15 @@ function migrate(db: Database.Database) {
   `);
 
   // —— Step 2: 软迁移老 DB（必须在索引之前）——
-  const cols = db.prepare(`PRAGMA table_info(shared_experiences)`).all() as { name: string }[];
-  if (!cols.some((c) => c.name === "application_id")) {
+  const sharedCols = db.prepare(`PRAGMA table_info(shared_experiences)`).all() as { name: string }[];
+  if (!sharedCols.some((c) => c.name === "application_id")) {
     db.exec(
       `ALTER TABLE shared_experiences ADD COLUMN application_id TEXT REFERENCES applications(id) ON DELETE SET NULL`,
     );
+  }
+  const appCols = db.prepare(`PRAGMA table_info(applications)`).all() as { name: string }[];
+  if (!appCols.some((c) => c.name === "resume_variant")) {
+    db.exec(`ALTER TABLE applications ADD COLUMN resume_variant TEXT`);
   }
 
   // —— Step 3: 建索引 ——

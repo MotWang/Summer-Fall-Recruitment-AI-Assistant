@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
-import { useEffect, useState } from "react";
 
 const NAV = [
   { href: "/", label: "概览", eyebrow: "01" },
@@ -16,22 +15,17 @@ const SETTINGS_NAV = { href: "/settings", label: "设置", eyebrow: "⚙" };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [provider, setProvider] = useState<"anthropic" | "bedrock" | "mock" | "?">("?");
-
-  useEffect(() => {
-    fetch("/api/stats")
-      .then((r) => r.json())
-      .then((j) => setProvider(j?.data?.aiProvider ?? "?"))
-      .catch(() => setProvider("?"));
-  }, []);
 
   return (
     <div className="min-h-screen flex">
-      <aside className="hidden md:flex w-[240px] shrink-0 flex-col border-r border-ink-100 px-6 py-7 bg-ivory-50/50">
-        <div>
-          <div className="label-eyebrow mb-2">Recruit Copilot</div>
-          <div className="font-serif text-[20px] leading-tight text-ink-800">
-            2027 Summer<br />& Fall 投递助手
+      <aside className="hidden md:flex w-[224px] shrink-0 flex-col border-r border-ink-100 px-5 py-6 bg-ivory-50/50">
+        <div className="flex items-center gap-2.5">
+          <span className="h-8 w-8 rounded-[10px] bg-clay-400 text-ivory-50 flex items-center justify-center text-base font-semibold">
+            R
+          </span>
+          <div className="leading-tight">
+            <div className="text-[15px] font-semibold text-ink-800">投递助手</div>
+            <div className="text-[11px] text-ink-400">2027 Summer · Fall</div>
           </div>
         </div>
 
@@ -85,18 +79,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span>{SETTINGS_NAV.label}</span>
           </Link>
           <div className="text-[11px] text-ink-300 leading-relaxed">
-            <div className="flex items-center gap-2">
-              <span
-                className={clsx(
-                  "h-1.5 w-1.5 rounded-full",
-                  provider === "anthropic" || provider === "bedrock" ? "bg-clay-400" : "bg-ink-200",
-                )}
-              />
-              <span>
-                AI Provider · <span className="text-ink-500">{provider}</span>
-              </span>
-            </div>
-            <p className="mt-2">
+            <p>
               数据保存在本地 SQLite。
               <Link className="link" href="/api/export">
                 导出 JSON
@@ -107,9 +90,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="flex-1 min-w-0">
-        <div className="md:hidden border-b border-ink-100 px-5 py-4 flex items-center justify-between">
-          <span className="font-serif text-lg text-ink-800">Recruit Copilot</span>
-          <span className="label-eyebrow">{provider}</span>
+        <div className="md:hidden border-b border-ink-100 px-5 py-3 flex items-center gap-2.5">
+          <span className="h-7 w-7 rounded-[8px] bg-clay-400 text-ivory-50 flex items-center justify-center text-sm font-semibold">
+            R
+          </span>
+          <span className="text-[15px] font-semibold text-ink-800">投递助手</span>
         </div>
         <div className="md:hidden border-b border-ink-100 px-5 py-2 overflow-x-auto">
           <div className="flex gap-3 text-sm">
@@ -131,7 +116,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </div>
         </div>
-        <div className="px-6 md:px-12 py-8 md:py-12 max-w-[1200px]">{children}</div>
+        <div className="px-5 md:px-10 py-6 md:py-10 max-w-[1200px]">{children}</div>
       </main>
     </div>
   );

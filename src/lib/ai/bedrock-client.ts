@@ -1,6 +1,6 @@
-// 小红书 MaaS / AWS Bedrock 代理 — InvokeModel with response stream
+// Claude 兼容网关 — InvokeModel with response stream
 // 路径：{baseUrl}/model/{modelId}/invoke-with-response-stream
-// 认证：Authorization: Bearer {MAAS_API_KEY}
+// 认证：Authorization: Bearer {API_KEY}
 
 import { getAppSettings } from "../repo";
 

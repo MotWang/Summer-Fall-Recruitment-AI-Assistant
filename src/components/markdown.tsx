@@ -23,6 +23,8 @@ function escape(s: string) {
 
 function inline(s: string) {
   let r = escape(s);
+  // 清理常见 emoji/icon，避免 AI 输出风格噪声影响阅读
+  r = r.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "");
   r = r.replace(/`([^`]+)`/g, "<code>$1</code>");
   r = r.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   r = r.replace(/\*([^*]+)\*/g, "<em>$1</em>");
