@@ -7,9 +7,9 @@ export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const module = searchParams.get("module") as ProfileModule | null;
+  const profileModule = searchParams.get("module") as ProfileModule | null;
   const status = searchParams.get("status") as ProfileEntry["status"] | null;
-  return ok(listProfileEntries({ module: module ?? undefined, status: status ?? undefined }));
+  return ok(listProfileEntries({ module: profileModule ?? undefined, status: status ?? undefined }));
 }
 
 export async function POST(req: NextRequest) {

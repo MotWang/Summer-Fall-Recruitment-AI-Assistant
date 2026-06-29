@@ -3,9 +3,7 @@
 
 import type {
   AiProvider,
-  InterviewPrepInput,
   ParsedEntry,
-  ParsedExperience,
   ParsedJob,
   ResumeStructured,
 } from "./types";

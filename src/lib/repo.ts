@@ -739,7 +739,7 @@ export function suggestMatchForEntry(candidate: Partial<ProfileEntry>): {
   for (const e of existing) {
     const sTitle = textSim(candidate.title, e.title);
     const sOrg = textSim(candidate.org, e.org);
-    const sTime = dateOverlap(candidate.startDate, candidate.endDate, e.startDate, e.endDate);
+    const sTime = dateOverlap(candidate.startDate, e.startDate);
     const score = sTitle * 0.5 + sOrg * 0.3 + sTime * 0.2;
     if (score > bestScore) {
       bestScore = score;
@@ -763,7 +763,7 @@ function textSim(a?: string | null, b?: string | null): number {
   return hit / Math.max(ag.size, bg.size);
 }
 
-function dateOverlap(a1?: string | null, a2?: string | null, b1?: string | null, b2?: string | null): number {
+function dateOverlap(a1?: string | null, b1?: string | null): number {
   if (!a1 && !b1) return 0;
   if (a1 && b1 && a1.slice(0, 7) === b1.slice(0, 7)) return 1;
   return 0;
