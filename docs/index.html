@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Recruit Copilot · 进入云端环境</title>
+    <meta
+      name="description"
+      content="一键在 GitHub Codespaces 云端运行 Recruit Copilot，无需本地安装。"
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f5f4ed;
+        --card: #fff;
+        --text: #1f1e1b;
+        --muted: #6b675f;
+        --accent: #cc785c;
+        --accent-hover: #b86a50;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #131210;
+          --card: #1c1a17;
+          --text: #eceae2;
+          --muted: #a8a296;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      main {
+        width: min(520px, 100%);
+        background: var(--card);
+        border: 1px solid rgba(127, 120, 110, 0.2);
+        border-radius: 20px;
+        padding: 40px 32px;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.75rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0 0 28px;
+        color: var(--muted);
+        line-height: 1.6;
+        font-size: 0.95rem;
+      }
+      .cta {
+        display: inline-block;
+        padding: 14px 28px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: background 0.15s ease;
+      }
+      .cta:hover {
+        background: var(--accent-hover);
+      }
+      .secondary {
+        display: block;
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 0.85rem;
+        text-decoration: none;
+      }
+      .secondary:hover {
+        text-decoration: underline;
+      }
+      .steps {
+        margin-top: 32px;
+        text-align: left;
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      .steps strong {
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Recruit Copilot</h1>
+      <p>2027 夏秋季投递助手 · 在 GitHub 云端直接运行，无需本地安装 Node。</p>
+      <a
+        class="cta"
+        id="launch"
+        href="https://codespaces.new/MotWang/Summer-Fall-Recruitment-AI-Assistant?quickstart=1"
+      >
+        进入云端环境
+      </a>
+      <a class="secondary" href="https://github.com/MotWang/Summer-Fall-Recruitment-AI-Assistant">
+        查看 GitHub 仓库
+      </a>
+      <div class="steps">
+        <strong>进入后会发生什么？</strong><br />
+        1. GitHub 自动创建 Codespace（首次约 2–3 分钟）<br />
+        2. 自动安装依赖并启动应用<br />
+        3. 浏览器打开端口 <strong>3055</strong>，即可使用<br />
+        <br />
+        未配置 API Key 时也可完整体验（本地 Mock 模式）。
+      </div>
+    </main>
+  </body>
+</html>

@@ -2,9 +2,17 @@
 
 一款本地优先的求职助手：把每一条 JD、每一轮面试、每一份过往经历，都沉淀为可被 AI 反复检索与重写的资产。
 
+## 云端一键进入（推荐）
+
+**直接点击链接，在 GitHub 云端打开应用，无需本地安装：**
+
+👉 **[进入云端环境](https://codespaces.new/MotWang/Summer-Fall-Recruitment-AI-Assistant?quickstart=1)**
+
+备用入口（GitHub Pages）：**https://motwang.github.io/Summer-Fall-Recruitment-AI-Assistant/**
+
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/MotWang/Summer-Fall-Recruitment-AI-Assistant?quickstart=1)
 
-**一键运行（推荐）**：点击上方徽章 → 等待 Codespace 创建完成 → 浏览器会自动打开 `http://localhost:3055`。无需本地安装 Node，AI 未配置时使用本地 Mock。
+首次进入约 2–3 分钟；环境就绪后会自动安装依赖、启动应用，并在浏览器打开端口 **3055**。未配置 API Key 时使用本地 Mock，功能完整可用。
 
 ---
 

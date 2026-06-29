@@ -7,15 +7,20 @@
     }
   },
   "postCreateCommand": "npm install",
-  "postStartCommand": "npm run dev",
+  "postStartCommand": "node scripts/codespace-start.mjs",
+  "postAttachCommand": "node scripts/codespace-start.mjs",
   "forwardPorts": [3055],
   "portsAttributes": {
     "3055": {
-      "label": "Recruit Copilot",
-      "onAutoForward": "openBrowser"
+      "label": "Recruit Copilot App",
+      "onAutoForward": "openBrowser",
+      "visibility": "public"
     }
   },
   "customizations": {
+    "codespaces": {
+      "openFiles": []
+    },
     "vscode": {
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash"
